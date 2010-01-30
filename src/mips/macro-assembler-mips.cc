@@ -119,6 +119,9 @@ void MacroAssembler::LoadRoot(Register destination,
 }
 
 
+// Will clobber 4 registers: object, offset, scratch, ip.  The
+// register 'object' contains a heap object pointer.  The heap object
+// tag is shifted away.
 void MacroAssembler::RecordWrite(Register object, Register offset,
                                  Register scratch) {
   UNIMPLEMENTED_MIPS();
