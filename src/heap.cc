@@ -44,6 +44,9 @@
 #if V8_TARGET_ARCH_ARM && V8_NATIVE_REGEXP
 #include "regexp-macro-assembler.h"
 #include "arm/regexp-macro-assembler-arm.h"
+#elif V8_TARGET_ARCH_MIPS && V8_NATIVE_REGEXP
+#include "regexp-macro-assembler.h"
+#include "mips/regexp-macro-assembler-mips.h"
 #endif
 
 namespace v8 {
@@ -390,6 +393,11 @@ void Heap::NotifyContextDisposed() {
 
 
 bool Heap::CollectGarbage(int requested_size, AllocationSpace space) {
+#ifdef V8_TARGET_ARCH_MIPS
+#ifdef DEBUG
+  printf ( "____________________\nHeap::CollectGarbage\n____________________\n" );
+#endif
+#endif
   // The VM is in the GC state until exiting this function.
   VMState state(GC);
 
@@ -1326,12 +1334,18 @@ Object* Heap::AllocateHeapNumber(double value, PretenureFlag pretenure) {
   if (always_allocate()) space = OLD_DATA_SPACE;
 
   Object* result = AllocateRaw(HeapNumber::kSize, space, OLD_DATA_SPACE);
+//#ifdef V8_HOST_ARCH_MIPS
+//// TODO(MIPS.6)
+//  // Align the result.
+//  result = (Object*) ((( ((int)result & ~1) + 7) & ~7)|1);
+//#endif
   if (result->IsFailure()) return result;
 
   HeapObject::cast(result)->set_map(heap_number_map());
   HeapNumber::cast(result)->set_value(value);
   return result;
 }
+
 
 
 Object* Heap::AllocateHeapNumber(double value) {
@@ -1343,6 +1357,11 @@ Object* Heap::AllocateHeapNumber(double value) {
   STATIC_ASSERT(HeapNumber::kSize <= Page::kMaxHeapObjectSize);
   ASSERT(allocation_allowed_ && gc_state_ == NOT_IN_GC);
   Object* result = new_space_.AllocateRaw(HeapNumber::kSize);
+//#ifdef V8_HOST_ARCH_MIPS
+//// TODO(MIPS.6)
+//  // Align the result.
+//  result = (Object*) ((( ((int)result & ~1) + 7) & ~7)|1);
+//#endif
   if (result->IsFailure()) return result;
   HeapObject::cast(result)->set_map(heap_number_map());
   HeapNumber::cast(result)->set_value(value);
@@ -1400,6 +1419,12 @@ void Heap::CreateRegExpCEntryStub() {
 }
 #endif
 
+#if V8_TARGET_ARCH_MIPS
+void Heap::CreateTestMIPSStub() {
+  TestMIPSStub stub;
+  set_test_mips_entry_code(*stub.GetCode());
+}
+#endif
 
 void Heap::CreateCEntryDebugBreakStub() {
   CEntryDebugBreakStub stub;
@@ -1439,6 +1464,9 @@ void Heap::CreateFixedStubs() {
   Heap::CreateJSConstructEntryStub();
 #if V8_TARGET_ARCH_ARM && V8_NATIVE_REGEXP
   Heap::CreateRegExpCEntryStub();
+#endif
+#ifdef V8_TARGET_ARCH_MIPS
+  Heap::CreateTestMIPSStub();
 #endif
 }
 

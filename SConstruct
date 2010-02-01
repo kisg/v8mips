@@ -173,6 +173,19 @@ LIBRARY_FLAGS = {
       'CCFLAGS':      ['-m32'],
       'LINKFLAGS':    ['-m32']
     },
+    'arch:mips': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS', 'NO_NATIVES'],
+      'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2', '-fno-inline'],
+      'LDFLAGS':      ['-EL']
+    },
+    'simulator:mips': {
+      'CCFLAGS':      ['-m32'],
+      'LINKFLAGS':    ['-m32']
+    },
+    'arch:mips-simu': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS', 'NO_NATIVES', 'MIPS_SIMU'],
+      'CCFLAGS':      [],
+    },
     'arch:x64': {
       'CPPDEFINES':   ['V8_TARGET_ARCH_X64'],
       'CCFLAGS':      ['-m64'],
@@ -280,6 +293,12 @@ V8_EXTRA_FLAGS = {
       # /wd4996 is to silence the warning about sscanf
       # used by the arm simulator.
       'WARNINGFLAGS': ['/wd4996']
+    },
+    'arch:mips': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS', 'NO_NATIVES'],
+    },
+    'arch:mips-simu': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS', 'NO_NATIVES', 'MIPS_SIMU'],
     },
     'disassembler:on': {
       'CPPDEFINES':   ['ENABLE_DISASSEMBLER']
@@ -423,7 +442,21 @@ SAMPLE_FLAGS = {
       'CCFLAGS':      ['-m64'],
       'LINKFLAGS':    ['-m64']
     },
+    'arch:mips': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS', 'NO_NATIVES'],
+      'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2', '-fno-inline'],
+      'LINKFLAGS':    ['-EL'],
+      'LDFLAGS':      ['-EL']
+    },
+    'arch:mips-simu': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS', 'NO_NATIVES', 'MIPS_SIMU'],
+      'CCFLAGS':      [],
+    },
     'simulator:arm': {
+      'CCFLAGS':      ['-m32'],
+      'LINKFLAGS':    ['-m32']
+    },
+    'simulator:mips': {
       'CCFLAGS':      ['-m32'],
       'LINKFLAGS':    ['-m32']
     },
@@ -560,7 +593,7 @@ SIMPLE_OPTIONS = {
     'help': 'the os to build for (' + OS_GUESS + ')'
   },
   'arch': {
-    'values':['arm', 'ia32', 'x64'],
+    'values':['arm', 'ia32', 'x64', 'mips'],
     'default': ARCH_GUESS,
     'help': 'the architecture to build for (' + ARCH_GUESS + ')'
   },
@@ -610,7 +643,7 @@ SIMPLE_OPTIONS = {
     'help': 'use Microsoft Visual C++ link-time code generation'
   },
   'simulator': {
-    'values': ['arm', 'none'],
+    'values': ['arm', 'mips', 'none'],
     'default': 'none',
     'help': 'build with simulator'
   },
@@ -758,6 +791,9 @@ class BuildContext(object):
       self.AppendFlags(result, flags[toolchain].get('all'))
       for option in sorted(self.options.keys()):
         value = self.options[option]
+        # On MIPS the flags needed to compile for the HW board are not accepted by gcc
+		# when compiling for x86.
+        if (self.options['simulator'] == 'mips' and value == 'mips'): value = 'mips-simu'
         self.AppendFlags(result, flags[toolchain].get(option + ':' + value))
     self.AppendFlags(result, flags.get('all'))
     return result
@@ -817,6 +853,10 @@ def PostprocessOptions(options):
       # Print a warning if arch has explicitly been set
       print "Warning: forcing architecture to match simulator (%s)" % options['simulator']
     options['arch'] = options['simulator']
+#    # On MIPS we can't keep mips arch flags when building the emulator
+#    if (options['simulator'] == 'mips-simu')
+#      print "Warning: Don't pay attention to the previous warning. (building mips simulator)"
+#      options['arch'] = 'mips'
   if (options['prof'] != 'off') and (options['profilingsupport'] == 'off'):
     # Print a warning if profiling is enabled without profiling support
     print "Warning: forcing profilingsupport on when prof is on"

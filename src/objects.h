@@ -34,6 +34,8 @@
 #include "unicode-inl.h"
 #if V8_TARGET_ARCH_ARM
 #include "arm/constants-arm.h"
+#elif V8_TARGET_ARCH_MIPS
+#include "mips/constants-mips.h"
 #endif
 
 //
@@ -1327,8 +1329,16 @@ class HeapNumber: public HeapObject {
 #endif
 
   // Layout description.
+//// TODO(MIPS.6)
+//#ifdef V8_TARGET_ARCH_MIPS
+//  // MODIFIED: On MIPS we need doubles to be 8-bytes aligned. (local) Memory
+//  // allocation was modified to return 8-bytes aligned objects, so we also need
+//  // a multiple of 8 offset here
+//  static const int kValueOffset = (HeapObject::kHeaderSize + 7) & ~7 ;
+//#else
   static const int kValueOffset = HeapObject::kHeaderSize;
-  // IEEE doubles are two 32 bit words.  The first is just mantissa, the second
+//#endif
+// IEEE doubles are two 32 bit words.  The first is just mantissa, the second
   // is a mixture of sign, exponent and mantissa.  Our current platforms are all
   // little endian apart from non-EABI arm which is little endian with big
   // endian floating point word ordering!
@@ -1340,7 +1350,15 @@ class HeapNumber: public HeapObject {
   static const int kExponentOffset = kValueOffset;
 # define BIG_ENDIAN_FLOATING_POINT 1
 #endif
+
+//// TODO(MIPS.6)
+//#ifdef V8_TARGET_ARCH_MIPS
+////  static const int kSize = kValueOffset + kDoubleSize;
+//  // Fix for double alignement on MIPS
+//  static const int kSize = (kValueOffset + kDoubleSize + 7) & ~7;
+//#else
   static const int kSize = kValueOffset + kDoubleSize;
+//#endif
 
   static const uint32_t kSignMask = 0x80000000u;
   static const uint32_t kExponentMask = 0x7ff00000u;

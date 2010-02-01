@@ -283,7 +283,13 @@ bool PagedSpace::Contains(Address addr) {
 HeapObject* PagedSpace::AllocateLinearly(AllocationInfo* alloc_info,
                                          int size_in_bytes) {
   Address current_top = alloc_info->top;
+//// TODO(MIPS.6)
+//#ifdef V8_TARGET_ARCH_MIPS
+//  Address new_top = current_top + RoundUp(size_in_bytes,8);
+//#else
   Address new_top = current_top + size_in_bytes;
+//#endif
+
   if (new_top > alloc_info->limit) return NULL;
 
   alloc_info->top = new_top;
@@ -345,7 +351,15 @@ int LargeObjectSpace::ExtraRSetBytesFor(int object_size) {
 
 Object* NewSpace::AllocateRawInternal(int size_in_bytes,
                                       AllocationInfo* alloc_info) {
-  Address new_top = alloc_info->top + size_in_bytes;
+
+  Address current_top = alloc_info->top;
+//// TODO(MIPS.6)
+//#ifdef V8_TARGET_ARCH_MIPS
+//  Address new_top = current_top + RoundUp(size_in_bytes,8);
+//#else
+  Address new_top = current_top + size_in_bytes;
+//#endif
+
   if (new_top > alloc_info->limit) return Failure::RetryAfterGC(size_in_bytes);
 
   Object* obj = HeapObject::FromAddress(alloc_info->top);

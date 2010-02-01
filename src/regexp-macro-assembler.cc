@@ -36,6 +36,8 @@
 #include "ia32/simulator-ia32.h"
 #elif V8_TARGET_ARCH_X64
 #include "x64/simulator-x64.h"
+#elif V8_TARGET_ARCH_MIPS
+#include "mips/simulator-mips.h"
 #endif
 
 namespace v8 {

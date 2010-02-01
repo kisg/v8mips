@@ -118,7 +118,7 @@ DEFINE_bool(enable_sahf, true,
 // bootstrapper.cc
 DEFINE_string(expose_natives_as, NULL, "expose natives in global object")
 DEFINE_string(expose_debug_as, NULL, "expose debug in global object")
-DEFINE_string(natives_file, NULL, "alternative natives file")
+DEFINE_string(natives_file, "", "alternative natives file")
 DEFINE_bool(expose_gc, false, "expose gc extension")
 DEFINE_int(stack_trace_limit, 10, "number of stack frames to capture")
 
@@ -141,7 +141,7 @@ DEFINE_bool(debug_info, true, "add debug information to compiled functions")
 DEFINE_bool(strict, false, "strict error checking")
 DEFINE_int(min_preparse_length, 1024,
            "minimum length for automatic enable preparsing")
-DEFINE_bool(fast_compiler, true,
+DEFINE_bool(fast_compiler, false,
             "use the fast-mode compiler for some top-level code")
 DEFINE_bool(trace_bailout, false,
             "print reasons for failing to use fast compilation")
@@ -204,8 +204,8 @@ DEFINE_bool(allow_natives_syntax, false, "allow natives syntax")
 // rewriter.cc
 DEFINE_bool(optimize_ast, true, "optimize the ast")
 
-// simulator-arm.cc
-DEFINE_bool(trace_sim, false, "trace simulator execution")
+// simulator-arm.cc and simulator-mips.cc
+DEFINE_bool(trace_sim, true, "trace simulator execution")
 DEFINE_int(stop_sim_at, 0, "Simulator stop after x number of instructions")
 
 // top.cc

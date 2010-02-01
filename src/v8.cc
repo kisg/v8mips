@@ -35,6 +35,8 @@
 
 #if V8_TARGET_ARCH_ARM
 #include "arm/simulator-arm.h"
+#elif V8_TARGET_ARCH_MIPS
+#include "mips/simulator-mips.h"
 #endif
 
 namespace v8 {

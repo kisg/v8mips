@@ -487,8 +487,11 @@ static inline bool is_intn(int x, int n)  {
   return -(1 << (n-1)) <= x && x < (1 << (n-1));
 }
 
-static inline bool is_int24(int x)  { return is_intn(x, 24); }
 static inline bool is_int8(int x)  { return is_intn(x, 8); }
+static inline bool is_int16(int x)  { return is_intn(x, 16); }
+static inline bool is_int18(int x)  { return is_intn(x, 18); }
+static inline bool is_int24(int x)  { return is_intn(x, 24); }
+static inline bool is_int28(int x)  { return is_intn(x, 28); }
 
 static inline bool is_uintn(int x, int n) {
   return (x & -(1 << n)) == 0;
@@ -500,9 +503,22 @@ static inline bool is_uint4(int x)  { return is_uintn(x, 4); }
 static inline bool is_uint5(int x)  { return is_uintn(x, 5); }
 static inline bool is_uint6(int x)  { return is_uintn(x, 6); }
 static inline bool is_uint8(int x)  { return is_uintn(x, 8); }
+static inline bool is_uint10(int x)  { return is_uintn(x, 10); }
 static inline bool is_uint12(int x)  { return is_uintn(x, 12); }
 static inline bool is_uint16(int x)  { return is_uintn(x, 16); }
 static inline bool is_uint24(int x)  { return is_uintn(x, 24); }
+static inline bool is_uint26(int x)  { return is_uintn(x, 26); }
+static inline bool is_uint28(int x)  { return is_uintn(x, 28); }
+
+
+static inline uint16_t NumberOfBitsSet(uint32_t x) {
+  uint32_t num_bits_set = 0;
+  for(int i=0; i<32; i++) {
+    if(x & 1<<i) num_bits_set++;
+  }
+  return num_bits_set;
+}
+
 
 } }  // namespace v8::internal
 

@@ -46,6 +46,9 @@ namespace internal {
 #elif defined(__ARMEL__)
 #define V8_HOST_ARCH_ARM 1
 #define V8_HOST_ARCH_32_BIT 1
+#elif defined(_MIPS_ARCH_MIPS32R2)
+#define V8_HOST_ARCH_MIPS 1
+#define V8_HOST_ARCH_32_BIT 1
 #else
 #error Your host architecture was not detected as supported by v8
 #endif
@@ -53,6 +56,8 @@ namespace internal {
 #if defined(V8_TARGET_ARCH_X64) || defined(V8_TARGET_ARCH_IA32)
 #define V8_TARGET_CAN_READ_UNALIGNED 1
 #elif V8_TARGET_ARCH_ARM
+#elif V8_TARGET_ARCH_MIPS
+#define V8_TARGET_CAN_READ_UNALIGNED 0
 #else
 #error Your target architecture is not supported by v8
 #endif
@@ -169,7 +174,16 @@ const Address kFromSpaceZapValue =
     reinterpret_cast<Address>(V8_UINT64_C(0x1beefdad0beefdad));
 #else
 const Address kZapValue = reinterpret_cast<Address>(0xdeadbeed);
+#ifndef V8_TARGET_ARCH_MIPS
 const Address kHandleZapValue = reinterpret_cast<Address>(0xbaddead);
+#else
+// On mips 0xbaddead is the encoding of jump to 0xeb77ab4.
+// This can be misleading when debugging and developping as we get a segfault
+// instead of an illegal instruction when executing it.
+// The 0b111011 opcode is reserved for future use. Executing this instruction
+// raises a Reserved Instruction Exception error on MIPS not using this opcode.
+const Address kHandleZapValue = reinterpret_cast<Address>(0xec000000);
+#endif
 const Address kFromSpaceZapValue = reinterpret_cast<Address>(0xbeefdad);
 #endif
 

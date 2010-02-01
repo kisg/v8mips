@@ -36,6 +36,11 @@ namespace internal {
 void* Malloced::New(size_t size) {
   ASSERT(NativeAllocationChecker::allocation_allowed());
   void* result = malloc(size);
+//#ifdef V8_HOST_ARCH_MIPS
+//// TODO(MIPS.6)
+//  // Check that the result is 8-byte aligned.
+//  ASSERT(((int)result & 7) == 0);
+//#endif
   if (result == NULL) V8::FatalProcessOutOfMemory("Malloced operator new");
   return result;
 }
@@ -107,6 +112,7 @@ bool PreallocatedStorage::preallocated_ = false;
 
 
 void PreallocatedStorage::Init(size_t size) {
+
   ASSERT(free_list_.next_ == &free_list_);
   ASSERT(free_list_.previous_ == &free_list_);
   PreallocatedStorage* free_chunk =

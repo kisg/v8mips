@@ -63,10 +63,24 @@ namespace internal {
 #define CODE_STUB_LIST_ARM(V)
 #endif
 
+// List of code stubs only used on MIPS platforms.
+#ifdef V8_TARGET_ARCH_MIPS
+#define CODE_STUB_LIST_MIPS(V) \
+  V(GetProperty)               \
+  V(SetProperty)               \
+  V(InvokeBuiltin)             \
+  V(RegExpCEntry)              \
+  V(TestMIPS)
+#else
+#define CODE_STUB_LIST_MIPS(V)
+#endif
+
 // Combined list of code stubs.
 #define CODE_STUB_LIST(V)  \
   CODE_STUB_LIST_ALL(V)    \
-  CODE_STUB_LIST_ARM(V)
+  CODE_STUB_LIST_ARM(V)    \
+  CODE_STUB_LIST_MIPS(V)   \
+
 
 // Stub is base classes of all stubs.
 class CodeStub BASE_EMBEDDED {

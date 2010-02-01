@@ -898,7 +898,7 @@ bool Genesis::CompileScriptCached(Vector<const char> name,
   Handle<JSFunction> fun =
       Factory::NewFunctionFromBoilerplate(boilerplate, context);
 
-  // Call function using the either the runtime object or the global
+  // Call function using either the runtime object or the global
   // object as the receiver. Provide no parameters.
   Handle<Object> receiver =
       Handle<Object>(use_runtime_context
@@ -1107,6 +1107,7 @@ bool Genesis::InstallNatives() {
          i < Natives::GetBuiltinsCount();
          i++) {
       if (!CompileBuiltin(i)) return false;
+      printf("Compiled Builtin %d\n", i);
     }
 
     // Setup natives with lazy loading.
@@ -1547,7 +1548,9 @@ Genesis::Genesis(Handle<Object> global_object,
 
   CreateRoots(global_template, global_object);
 
+#ifndef NO_NATIVES
   if (!InstallNatives()) return;
+  printf ( "InstallNatives done.\n" );
 
   MakeFunctionInstancePrototypeWritable();
   BuildSpecialFunctionTable();
@@ -1557,6 +1560,7 @@ Genesis::Genesis(Handle<Object> global_object,
   if (!InstallExtensions(extensions)) return;
 
   if (!InstallSpecialObjects()) return;
+#endif
 
   result_ = global_context_;
 }

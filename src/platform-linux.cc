@@ -90,11 +90,14 @@ double OS::nan_value() {
 
 
 int OS::ActivationFrameAlignment() {
-#ifdef V8_TARGET_ARCH_ARM
+#ifdef V8_TARGET_ARCH_ARM 
   // On EABI ARM targets this is required for fp correctness in the
   // runtime system.
   return 8;
 #else
+  #ifdef V8_TARGET_ARCH_MIPS 
+  return 8;
+  #endif
   // With gcc 4.4 the tree vectorization optimiser can generate code
   // that requires 16 byte alignment such as movdqa on x86.
   return 16;
@@ -187,6 +190,9 @@ void OS::DebugBreak() {
 //  which is the architecture of generated code).
 #if defined(__arm__) || defined(__thumb__)
   asm("bkpt 0");
+#elif defined(__mips__)
+  // The code field of the break instruction is available for use as software parameters.
+  asm("break");
 #else
   asm("int $3");
 #endif
@@ -636,8 +642,8 @@ static inline bool IsVmThread() {
   return false;
 }
 
-
 static void ProfilerSignalHandler(int signal, siginfo_t* info, void* context) {
+#ifndef V8_HOST_ARCH_MIPS
   USE(info);
   if (signal != SIGPROF) return;
   if (active_sampler_ == NULL) return;
@@ -668,6 +674,8 @@ static void ProfilerSignalHandler(int signal, siginfo_t* info, void* context) {
     sample.sp = mcontext.arm_sp;
     sample.fp = mcontext.arm_fp;
 #endif
+#elif V8_HOST_ARCH_MIPS
+// TODO Implement this on MIPS. 
 #endif
     if (IsVmThread())
       active_sampler_->SampleStack(&sample);
@@ -677,6 +685,7 @@ static void ProfilerSignalHandler(int signal, siginfo_t* info, void* context) {
   sample.state = Logger::state();
 
   active_sampler_->Tick(&sample);
+#endif
 }
 
 

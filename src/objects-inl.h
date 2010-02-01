@@ -1072,8 +1072,7 @@ MapWord HeapObject::map_word() {
 
 
 void HeapObject::set_map_word(MapWord map_word) {
-  // WRITE_FIELD does not update the remembered set, but there is no need
-  // here.
+  // WRITE_FIELD does not update the remembered set, but there is no need here.
   WRITE_FIELD(this, kMapOffset, reinterpret_cast<Object*>(map_word.value_));
 }
 
@@ -1146,14 +1145,77 @@ void HeapObject::ClearOverflow() {
 }
 
 
+#ifndef V8_HOST_ARCH_MIPS
 double HeapNumber::value() {
   return READ_DOUBLE_FIELD(this, kValueOffset);
 }
+#else
+// TODO(MIPS.6)
+double HeapNumber::value() {
+  double res;
+  byte* addr = (reinterpret_cast<byte*>(this) + kValueOffset - kHeapObjectTag);
+  uint32_t p = ((uint32_t)addr & 0x7);
+  uint32_t* res_addr = (uint32_t*) &res;
+
+  if(p == 0) {
+    // 8-byte aligned read is legal.
+    return READ_DOUBLE_FIELD(this, kValueOffset);
+  } else {
+    // Cannot read at an unaligned address. Read manually.
+//  asm("break");
+    asm(".set noat");
+  asm("lw $1, 0(%1);" 
+      "sw $1, 0(%2)" 
+      : "=r" (p)
+      : "r" (addr), "r" (res_addr)
+      );
+  asm("lw $1, 4(%1);" 
+      "sw $1, 4(%2)" 
+      : "=r" (p)
+      : "r" (addr), "r" (res_addr)
+      );
+    asm(".set at");
+  }
+  return res;
+}
+#endif
 
 
+#ifndef V8_HOST_ARCH_MIPS
 void HeapNumber::set_value(double value) {
   WRITE_DOUBLE_FIELD(this, kValueOffset, value);
 }
+#else
+// TODO(MIPS.6)
+void HeapNumber::set_value(double value) {
+
+  byte* addr = (reinterpret_cast<byte*>(this) + kValueOffset - kHeapObjectTag);
+  uint32_t p = ((uint32_t)addr & 0x7);
+
+  if(p == 0) {
+    // 8-byte aligned write is legal.
+    WRITE_DOUBLE_FIELD(this, kValueOffset, value);
+  } else {
+    // Cannot store to an unaligned address. Store manually.
+    // mfc1 must be executed first. (See MIPS ISA)
+//  asm("break");
+    asm(".set noat");
+    asm("mfc1 $1, %1;" 
+      "sw $1, 4(%2)" 
+      : "=r" (p)
+      : "f" (value), "r" (addr)
+      );
+    asm("mfhc1 $1, %1;" 
+      "sw $1, 0(%2)" 
+      : "=r" (p)
+      : "f" (value), "r" (addr)
+      );
+    asm(".set at");
+   // In debug mode value is actually passed in a2-a3. If this is always the
+   // case we could spare the need to use the coprocessor and be much faster.
+   }
+}
+#endif
 
 
 ACCESSORS(JSObject, properties, FixedArray, kPropertiesOffset)

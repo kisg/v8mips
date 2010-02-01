@@ -154,7 +154,13 @@ namespace internal {
   UNCONDITIONAL_STRONG_ROOT_LIST(V)                                            \
   V(Code, re_c_entry_code, RegExpCEntryCode)
 #else
+#if V8_TARGET_ARCH_MIPS
+#define STRONG_ROOT_LIST(V)                                                    \
+  UNCONDITIONAL_STRONG_ROOT_LIST(V)                                            \
+  V(Code, test_mips_entry_code, TestMIPSCode)
+#else
 #define STRONG_ROOT_LIST(V) UNCONDITIONAL_STRONG_ROOT_LIST(V)
+#endif
 #endif
 
 #define ROOT_LIST(V)                                  \
@@ -1071,6 +1077,9 @@ class Heap : public AllStatic {
   static void CreateJSEntryStub();
   static void CreateJSConstructEntryStub();
   static void CreateRegExpCEntryStub();
+#ifdef V8_TARGET_ARCH_MIPS
+  static void CreateTestMIPSStub();
+#endif
 
   static void CreateFixedStubs();
 

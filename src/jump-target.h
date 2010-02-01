@@ -113,8 +113,13 @@ class JumpTarget : public ZoneObject {  // Shadows are dynamically allocated.
   // Emit a conditional branch to the target.  There must be a current
   // frame at the branch.  The current frame will fall through to the
   // code after the branch.
+#ifndef V8_TARGET_ARCH_MIPS
   virtual void Branch(Condition cc, Hint hint = no_hint);
   virtual void Branch(Condition cc, Result* arg, Hint hint = no_hint);
+#else
+  virtual void Branch(Condition cc, Hint hint = no_hint, Register src1 = zero_reg, const Operand& src2 = Operand(zero_reg));
+  virtual void Branch(Condition cc, Result* arg, Hint hint = no_hint, Register src1 = zero_reg, const Operand& src2 = Operand(zero_reg));
+#endif
 
   // Bind a jump target.  If there is no current frame at the binding
   // site, there must be at least one frame reaching via a forward
@@ -153,7 +158,11 @@ class JumpTarget : public ZoneObject {  // Shadows are dynamically allocated.
   // Implementations of Jump, Branch, and Bind with all arguments and
   // return values using the virtual frame.
   void DoJump();
+#ifndef V8_TARGET_ARCH_MIPS
   void DoBranch(Condition cc, Hint hint);
+#else
+  void DoBranch(Condition cc, Hint hint, Register src1 = zero_reg, const Operand& src2 = Operand(zero_reg));
+#endif
   void DoBind();
 
  private:
@@ -210,8 +219,15 @@ class BreakTarget : public JumpTarget {
   // Emit a conditional branch to the target.  There must be a current
   // frame at the branch.  The current frame will fall through to the
   // code after the branch.
+#ifndef V8_TARGET_ARCH_MIPS
   virtual void Branch(Condition cc, Hint hint = no_hint);
   virtual void Branch(Condition cc, Result* arg, Hint hint = no_hint);
+#else
+  virtual void Branch(Condition cc, Hint hint = no_hint,
+      Register src1 = zero_reg, const Operand& src2 = Operand(zero_reg));
+  virtual void Branch(Condition cc, Result* arg, Hint hint = no_hint,
+      Register src1 = zero_reg, const Operand& src2 = Operand(zero_reg));
+#endif
 
   // Bind a break target.  If there is no current frame at the binding
   // site, there must be at least one frame reaching via a forward

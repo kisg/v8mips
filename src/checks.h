@@ -37,6 +37,8 @@ void API_Fatal(const char* location, const char* format, ...);
 
 // The FATAL, UNREACHABLE and UNIMPLEMENTED macros are useful during
 // development, but they should not be relied on in the final product.
+#ifndef V8_TARGET_ARCH_MIPS
+
 #ifdef DEBUG
 #define FATAL(msg)                              \
   V8_Fatal(__FILE__, __LINE__, "%s", (msg))
@@ -52,6 +54,24 @@ void API_Fatal(const char* location, const char* format, ...);
 #define UNREACHABLE() ((void) 0)
 #endif
 
+#else
+
+#ifdef DEBUG
+#define FATAL(msg)                              \
+  V8_Fatal(__FILE__, __LINE__, "%s", (msg))
+#define UNIMPLEMENTED()                         \
+  printf("%s, \tline %d: \tfunction %s not implemented. \n",__FILE__, __LINE__, __func__);
+#define UNREACHABLE()                           \
+  V8_Fatal(__FILE__, __LINE__, "unreachable code")
+#else
+#define FATAL(msg)                              \
+  V8_Fatal("", 0, "%s", (msg))
+#define UNIMPLEMENTED()                         \
+  printf("%s, \tline %d: \tfunction %s not implemented. \n",__FILE__, __LINE__, __func__);
+#define UNREACHABLE() ((void) 0)
+#endif
+
+#endif
 
 // Used by the CHECK macro -- should not be called directly.
 static inline void CheckHelper(const char* file,

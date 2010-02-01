@@ -119,6 +119,8 @@ static Handle<Code> MakeCode(FunctionLiteral* literal,
     return Handle<Code>::null();
   }
 
+  // No support for FastCodeGenerator on MIPS yet.
+#ifndef V8_TARGET_ARCH_MIPS
   // Generate code and return it.
   if (FLAG_fast_compiler) {
     // If there is no shared function info, try the fast code
@@ -138,6 +140,9 @@ static Handle<Code> MakeCode(FunctionLiteral* literal,
     }
   }
   return CodeGenerator::MakeCode(literal, script, is_eval);
+#else
+  return CodeGenerator::MakeCode(literal, script, is_eval);
+#endif
 }
 
 
