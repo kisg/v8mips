@@ -1,0 +1,10 @@
+BugId: 
+SEND_COMMENT_BUGZILLA
+CVS: ---------- Bug ID syntax ---------------------------------------------
+CVS: BugId: id [[[, id], id] ... ] 
+CVS: each id can be none or xxxx or ct-xxxx
+CVS: 
+CVS: If you don't want to send comment into Bugzilla, please remove
+CVS: SEND_COMMENT_BUGZILLA line, otherwise your comment is posted in
+CVS: Bugzilla at bug ID xxxx.
+CVS: ----------------------------------------------------------------------
