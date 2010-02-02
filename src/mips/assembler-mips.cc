@@ -30,11 +30,7 @@
 
 // The original source code covered by the above license above has been
 // modified significantly by Google Inc.
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Copyright 2010 the V8 project authors. All rights reserved.
-=======
-// Copyright 2006-2010 the V8 project authors. All rights reserved.
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 
 
 #include "v8.h"
@@ -178,11 +174,7 @@ Register ToRegister(int num) {
 
 
 // -----------------------------------------------------------------------------
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Implementation of RelocInfo.
-=======
-// Implementation of RelocInfo
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 
 const int RelocInfo::kApplyMask = 0;
 
@@ -203,22 +195,13 @@ void RelocInfo::PatchCode(byte* instructions, int instruction_count) {
 // Additional guard instructions can be added if required.
 void RelocInfo::PatchCodeWithCall(Address target, int guard_bytes) {
   // Patch the code at the current address with a call to the target.
-<<<<<<< HEAD:src/mips/assembler-mips.cc
   UNIMPLEMENTED_MIPS();
-=======
-  UNIMPLEMENTED();
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 }
 
 
 // -----------------------------------------------------------------------------
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Implementation of Operand and MemOperand.
 // See assembler-mips-inl.h for inlined constructors.
-=======
-// Implementation of Operand and MemOperand
-// See assembler-mips-inl.h for inlined constructors
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 
 Operand::Operand(Handle<Object> handle) {
   rm_ = no_reg;
@@ -229,11 +212,7 @@ Operand::Operand(Handle<Object> handle) {
     imm32_ = reinterpret_cast<intptr_t>(handle.location());
     rmode_ = RelocInfo::EMBEDDED_OBJECT;
   } else {
-<<<<<<< HEAD:src/mips/assembler-mips.cc
     // No relocation needed.
-=======
-    // no relocation needed
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
     imm32_ = reinterpret_cast<intptr_t>(obj);
     rmode_ = RelocInfo::NONE;
   }
@@ -245,22 +224,14 @@ MemOperand::MemOperand(Register rm, int16_t offset) : Operand(rm) {
 
 
 // -----------------------------------------------------------------------------
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Implementation of Assembler.
-=======
-// Implementation of Assembler
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 
 static const int kMinimalBufferSize = 4*KB;
 static byte* spare_buffer_ = NULL;
 
 Assembler::Assembler(void* buffer, int buffer_size) {
   if (buffer == NULL) {
-<<<<<<< HEAD:src/mips/assembler-mips.cc
     // Do our own buffer management.
-=======
-    // do our own buffer management
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
     if (buffer_size <= kMinimalBufferSize) {
       buffer_size = kMinimalBufferSize;
 
@@ -278,22 +249,14 @@ Assembler::Assembler(void* buffer, int buffer_size) {
     own_buffer_ = true;
 
   } else {
-<<<<<<< HEAD:src/mips/assembler-mips.cc
     // Use externally provided buffer instead.
-=======
-    // use externally provided buffer instead
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
     ASSERT(buffer_size > 0);
     buffer_ = static_cast<byte*>(buffer);
     buffer_size_ = buffer_size;
     own_buffer_ = false;
   }
 
-<<<<<<< HEAD:src/mips/assembler-mips.cc
   // Setup buffer pointers.
-=======
-  // setup buffer pointers
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   ASSERT(buffer_ != NULL);
   pc_ = buffer_;
   reloc_info_writer.Reposition(buffer_ + buffer_size, pc_);
@@ -317,11 +280,7 @@ Assembler::~Assembler() {
 
 void Assembler::GetCode(CodeDesc* desc) {
   ASSERT(pc_ <= reloc_info_writer.pos());  // no overlap
-<<<<<<< HEAD:src/mips/assembler-mips.cc
   // Setup code descriptor.
-=======
-  // setup desc
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   desc->buffer = buffer_;
   desc->buffer_size = buffer_size_;
   desc->instr_size = pc_offset();
@@ -348,7 +307,6 @@ bool Assembler::is_branch(Instr instr) {
   uint32_t rt_field = ((instr & kRtFieldMask));
   uint32_t rs_field = ((instr & kRsFieldMask));
   // Checks if the instruction is a branch.
-<<<<<<< HEAD:src/mips/assembler-mips.cc
   return opcode == BEQ ||
       opcode == BNE ||
       opcode == BLEZ ||
@@ -360,21 +318,6 @@ bool Assembler::is_branch(Instr instr) {
       (opcode == REGIMM && (rt_field == BLTZ || rt_field == BGEZ ||
                             rt_field == BLTZAL || rt_field == BGEZAL)) ||
       (opcode == COP1 && rs_field == BC1);  // Coprocessor branch.
-=======
-  return    opcode == BEQ
-         || opcode == BNE
-         || opcode == BLEZ
-         || opcode == BGTZ
-         || opcode == BEQL
-         || opcode == BNEL
-         || opcode == BLEZL
-         || opcode == BGTZL
-         || (opcode == REGIMM &&  (rt_field == BLTZ
-                                || rt_field == BGEZ
-                                || rt_field == BLTZAL
-                                || rt_field == BGEZAL))
-         || (opcode == COP1 && rs_field == BC1);    // Coprocessor branch
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 }
 
 
@@ -388,12 +331,8 @@ int Assembler::target_at(int32_t pos) {
   ASSERT(is_branch(instr));
   // Do NOT change this to <<2. We rely on arithmetic shifts here, assuming
   // the compiler uses arithmectic shifts for signed integers.
-<<<<<<< HEAD:src/mips/assembler-mips.cc
   int32_t imm18 = ((instr &
                     static_cast<int32_t>(kImm16Mask)) << 16) >> 14;
-=======
-  int32_t imm18 = (((int32_t)instr & (int32_t)kImm16Mask) << 16) >> 14;
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 
   return pos + kBranchPCOffset + imm18;
 }
@@ -464,11 +403,7 @@ void Assembler::bind_to(Label* L, int pos) {
 void Assembler::link_to(Label* L, Label* appendix) {
   if (appendix->is_linked()) {
     if (L->is_linked()) {
-<<<<<<< HEAD:src/mips/assembler-mips.cc
       // Append appendix to L's list.
-=======
-      // append appendix to L's list
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
       int fixup_pos;
       int link = L->pos();
       do {
@@ -526,11 +461,7 @@ void Assembler::GenInstrRegister(Opcode opcode,
                                  SecondaryField func) {
   ASSERT(rd.is_valid() && rs.is_valid() && rt.is_valid() && is_uint5(sa));
   Instr instr = opcode | (rs.code() << kRsShift) | (rt.code() << kRtShift)
-<<<<<<< HEAD:src/mips/assembler-mips.cc
       | (rd.code() << kRdShift) | (sa << kSaShift) | func;
-=======
-                       | (rd.code() << kRdShift) | (sa << kSaShift) | func;
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   emit(instr);
 }
 
@@ -543,11 +474,7 @@ void Assembler::GenInstrRegister(Opcode opcode,
                                  SecondaryField func) {
   ASSERT(fd.is_valid() && fs.is_valid() && ft.is_valid());
   Instr instr = opcode | fmt | (ft.code() << 16) | (fs.code() << kFsShift)
-<<<<<<< HEAD:src/mips/assembler-mips.cc
       | (fd.code() << 6) | func;
-=======
-                             | (fd.code() << 6)   | func;
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   emit(instr);
 }
 
@@ -559,35 +486,21 @@ void Assembler::GenInstrRegister(Opcode opcode,
                                  FPURegister fd,
                                  SecondaryField func) {
   ASSERT(fd.is_valid() && fs.is_valid() && rt.is_valid());
-<<<<<<< HEAD:src/mips/assembler-mips.cc
   Instr instr = opcode | fmt | (rt.code() << kRtShift)
       | (fs.code() << kFsShift) | (fd.code() << 6) | func;
-=======
-  Instr instr = opcode | fmt | (rt.code() << kRtShift) | (fs.code() << kFsShift)
-                             | (fd.code() << 6)   | func;
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   emit(instr);
 }
 
 
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Instructions with immediate value.
-=======
-// Instructions with immediate value
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 // Registers are in the order of the instruction encoding, from left to right.
 void Assembler::GenInstrImmediate(Opcode opcode,
                                   Register rs,
                                   Register rt,
                                   int32_t j) {
   ASSERT(rs.is_valid() && rt.is_valid() && (is_int16(j) || is_uint16(j)));
-<<<<<<< HEAD:src/mips/assembler-mips.cc
   Instr instr = opcode | (rs.code() << kRsShift) | (rt.code() << kRtShift)
       | (j & kImm16Mask);
-=======
-  Instr instr = opcode | (rs.code() << kRsShift)
-                       | (rt.code() << kRtShift) | (j & kImm16Mask);
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   emit(instr);
 }
 
@@ -607,13 +520,8 @@ void Assembler::GenInstrImmediate(Opcode opcode,
                                   FPURegister ft,
                                   int32_t j) {
   ASSERT(rs.is_valid() && ft.is_valid() && (is_int16(j) || is_uint16(j)));
-<<<<<<< HEAD:src/mips/assembler-mips.cc
   Instr instr = opcode | (rs.code() << kRsShift) | (ft.code() << kFtShift)
       | (j & kImm16Mask);
-=======
-  Instr instr = opcode | (rs.code() << kRsShift)
-                       | (ft.code() << kFtShift) | (j & kImm16Mask);
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   emit(instr);
 }
 
@@ -737,11 +645,7 @@ void Assembler::jalr(Register rs, Register rd) {
 
 //-------Data-processing-instructions---------
 
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Arithmetic.
-=======
-// Arithmetic
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 
 void Assembler::add(Register rd, Register rs, Register rt) {
   GenInstrRegister(SPECIAL, rs, rt, rd, 0, ADD);
@@ -798,11 +702,7 @@ void Assembler::divu(Register rs, Register rt) {
 }
 
 
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Logical.
-=======
-// Logical
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 
 void Assembler::and_(Register rd, Register rs, Register rt) {
   GenInstrRegister(SPECIAL, rs, rt, rd, 0, AND);
@@ -839,11 +739,7 @@ void Assembler::nor(Register rd, Register rs, Register rt) {
 }
 
 
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Shifts.
-=======
-// Shifts
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 void Assembler::sll(Register rd, Register rt, uint16_t sa) {
   GenInstrRegister(SPECIAL, zero_reg, rt, rd, sa, SLL);
 }
@@ -908,11 +804,7 @@ void Assembler::lui(Register rd, int32_t j) {
 
 //-------------Misc-instructions--------------
 
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Break / Trap instructions.
-=======
-// Break / Trap instructions
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 void Assembler::break_(uint32_t code) {
   ASSERT((code & ~0xfffff) == 0);
   Instr break_instr = SPECIAL | BREAK | (code << 6);
@@ -922,26 +814,18 @@ void Assembler::break_(uint32_t code) {
 
 void Assembler::tge(Register rs, Register rt, uint16_t code) {
   ASSERT(is_uint10(code));
-<<<<<<< HEAD:src/mips/assembler-mips.cc
   Instr instr = SPECIAL | TGE | rs.code() << kRsShift
       | rt.code() << kRtShift | code << 6;
-=======
   Instr instr =
     SPECIAL | TGE | rs.code() << kRsShift | rt.code() << kRtShift | code << 6;
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   emit(instr);
 }
 
 
 void Assembler::tgeu(Register rs, Register rt, uint16_t code) {
   ASSERT(is_uint10(code));
-<<<<<<< HEAD:src/mips/assembler-mips.cc
   Instr instr = SPECIAL | TGEU | rs.code() << kRsShift
       | rt.code() << kRtShift | code << 6;
-=======
-  Instr instr =
-    SPECIAL | TGEU | rs.code() << kRsShift | rt.code() << kRtShift | code << 6;
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   emit(instr);
 }
 
@@ -949,24 +833,15 @@ void Assembler::tgeu(Register rs, Register rt, uint16_t code) {
 void Assembler::tlt(Register rs, Register rt, uint16_t code) {
   ASSERT(is_uint10(code));
   Instr instr =
-<<<<<<< HEAD:src/mips/assembler-mips.cc
       SPECIAL | TLT | rs.code() << kRsShift | rt.code() << kRtShift | code << 6;
-=======
-    SPECIAL | TLT | rs.code() << kRsShift | rt.code() << kRtShift | code << 6;
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   emit(instr);
 }
 
 
 void Assembler::tltu(Register rs, Register rt, uint16_t code) {
   ASSERT(is_uint10(code));
-<<<<<<< HEAD:src/mips/assembler-mips.cc
   Instr instr = SPECIAL | TLTU | rs.code() << kRsShift
       | rt.code() << kRtShift | code << 6;
-=======
-  Instr instr =
-    SPECIAL | TLTU | rs.code() << kRsShift | rt.code() << kRtShift | code << 6;
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   emit(instr);
 }
 
@@ -974,11 +849,7 @@ void Assembler::tltu(Register rs, Register rt, uint16_t code) {
 void Assembler::teq(Register rs, Register rt, uint16_t code) {
   ASSERT(is_uint10(code));
   Instr instr =
-<<<<<<< HEAD:src/mips/assembler-mips.cc
       SPECIAL | TEQ | rs.code() << kRsShift | rt.code() << kRtShift | code << 6;
-=======
-    SPECIAL | TEQ | rs.code() << kRsShift | rt.code() << kRtShift | code << 6;
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   emit(instr);
 }
 
@@ -986,20 +857,12 @@ void Assembler::teq(Register rs, Register rt, uint16_t code) {
 void Assembler::tne(Register rs, Register rt, uint16_t code) {
   ASSERT(is_uint10(code));
   Instr instr =
-<<<<<<< HEAD:src/mips/assembler-mips.cc
       SPECIAL | TNE | rs.code() << kRsShift | rt.code() << kRtShift | code << 6;
-=======
-    SPECIAL | TNE | rs.code() << kRsShift | rt.code() << kRtShift | code << 6;
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   emit(instr);
 }
 
 
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Move from HI/LO register.
-=======
-// Move from HI/LO register
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 
 void Assembler::mfhi(Register rd) {
   GenInstrRegister(SPECIAL, zero_reg, zero_reg, rd, 0, MFHI);
@@ -1011,11 +874,7 @@ void Assembler::mflo(Register rd) {
 }
 
 
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Set on less than instructions.
-=======
-// Set on less than instructions
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 void Assembler::slt(Register rd, Register rs, Register rt) {
   GenInstrRegister(SPECIAL, rs, rt, rd, 0, SLT);
 }
@@ -1038,11 +897,7 @@ void Assembler::sltiu(Register rt, Register rs, int32_t j) {
 
 //--------Coprocessor-instructions----------------
 
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Load, store, move.
-=======
-// Load, store, move
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 void Assembler::lwc1(FPURegister fd, const MemOperand& src) {
   GenInstrImmediate(LWC1, src.rm(), fd, src.offset_);
 }
@@ -1083,11 +938,7 @@ void Assembler::mfhc1(FPURegister fs, Register rt) {
 }
 
 
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Conversions.
-=======
-// Conversions
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 
 void Assembler::cvt_w_s(FPURegister fd, FPURegister fs) {
   GenInstrRegister(COP1, S, f0, fs, fd, CVT_W_S);
@@ -1139,22 +990,13 @@ void Assembler::cvt_d_s(FPURegister fd, FPURegister fs) {
 }
 
 
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Conditions.
-=======
-// Conditions
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 void Assembler::c(FPUCondition cond, SecondaryField fmt,
     FPURegister ft, FPURegister fs, uint16_t cc) {
   ASSERT(is_uint3(cc));
   ASSERT((fmt & ~(31 << kRsShift)) == 0);
-<<<<<<< HEAD:src/mips/assembler-mips.cc
   Instr instr = COP1 | fmt | ft.code() << 16 | fs.code() << kFsShift
       | cc << 8 | 3 << 4 | cond;
-=======
-  Instr instr =
-    COP1 | fmt | ft.code() << 16 | fs.code() << kFsShift | cc << 8 | 3 << 4 | cond;
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
   emit(instr);
 }
 
@@ -1173,11 +1015,7 @@ void Assembler::bc1t(int16_t offset, uint16_t cc) {
 }
 
 
-<<<<<<< HEAD:src/mips/assembler-mips.cc
 // Debugging.
-=======
-// Debugging
->>>>>>> Code for MIPS assembler, disassembler, and simulator.:src/mips/assembler-mips.cc
 void Assembler::RecordJSReturn() {
   WriteRecordedPositions();
   CheckBuffer();
