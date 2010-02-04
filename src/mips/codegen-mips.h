@@ -166,8 +166,6 @@ class CodeGenerator: public AstVisitor {
   // Generating deferred code.
   void ProcessDeferred();
 
-  bool is_eval() { return is_eval_; }
-
   // State
   bool has_cc() const  { return cc_reg_ != cc_always; }
   TypeofState typeof_state() const { return state_->typeof_state(); }
