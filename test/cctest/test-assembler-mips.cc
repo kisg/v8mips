@@ -255,3 +255,4 @@ TEST(MIPS2) {
 }
 
 #undef __
+

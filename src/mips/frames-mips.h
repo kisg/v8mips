@@ -162,3 +162,4 @@ inline Object* JavaScriptFrame::function_slot_object() const {
 } }  // namespace v8::internal
 
 #endif
+
