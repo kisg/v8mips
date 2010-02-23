@@ -184,7 +184,7 @@ class CodeGenerator: public AstVisitor {
 #undef DEF_VISIT
 
   // Main code generation function
-  void Generate(CompilationInfo* info, Mode mode);
+  void Generate(CompilationInfo* info);
 
   struct InlineRuntimeLUT {
     void (CodeGenerator::*method)(ZoneList<Expression*>*);

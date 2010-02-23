@@ -787,6 +787,16 @@ void MacroAssembler::Call(Label* target) {
 }
 
 
+#ifdef ENABLE_DEBUGGER_SUPPORT
+  // ---------------------------------------------------------------------------
+  // Debugger Support
+
+  void MacroAssembler::DebugBreak() {
+    UNIMPLEMENTED_MIPS();
+  }
+#endif
+
+
 // ---------------------------------------------------------------------------
 // Exception handling
 

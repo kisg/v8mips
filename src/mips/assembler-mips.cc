@@ -816,8 +816,6 @@ void Assembler::tge(Register rs, Register rt, uint16_t code) {
   ASSERT(is_uint10(code));
   Instr instr = SPECIAL | TGE | rs.code() << kRsShift
       | rt.code() << kRtShift | code << 6;
-  Instr instr =
-    SPECIAL | TGE | rs.code() << kRsShift | rt.code() << kRtShift | code << 6;
   emit(instr);
 }
 
