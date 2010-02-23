@@ -480,6 +480,7 @@ void JSEntryStub::GenerateBody(MacroAssembler* masm, bool is_construct) {
   //
   // ***************************
 
+  __ break_(0x1234);
   
   // Restore callee saved registers from the stack.
    __ MultiPop(kCalleeSaved | ra.bit());
