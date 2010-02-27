@@ -321,4 +321,3 @@ Instruction::Type Instruction::InstructionType() const {
 }
 
 } }   // namespace assembler::mips
-

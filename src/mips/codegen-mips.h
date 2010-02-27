@@ -316,4 +316,3 @@ class CodeGenerator: public AstVisitor {
 } }  // namespace v8::internal
 
 #endif  // V8_MIPS_CODEGEN_MIPS_H_
-

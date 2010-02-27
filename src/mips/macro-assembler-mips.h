@@ -178,7 +178,7 @@ class MacroAssembler: public Assembler {
 
 
   // Push multiple registers on the stack.
-  // Registers are saved in numerical order, with high-er numbered registers
+  // Registers are saved in numerical order, with higher numbered registers
   // saved in higher memory addresses
   void MultiPush(RegList regs);
   void MultiPushReversed(RegList regs);
