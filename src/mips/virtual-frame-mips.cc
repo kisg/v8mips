@@ -53,7 +53,12 @@ void VirtualFrame::SyncElementByPushing(int index) {
 
 
 void VirtualFrame::SyncRange(int begin, int end) {
-  UNIMPLEMENTED_MIPS();
+  // All elements are in memory on MIPS (ie, synced).
+#ifdef DEBUG
+  for (int i = begin; i <= end; i++) {
+    ASSERT(elements_[i].is_synced());
+  }
+#endif
 }
 
 
@@ -85,10 +90,10 @@ void VirtualFrame::AllocateStackSlots() {
     Adjust(count);
       // Initialize stack slots with 'undefined' value.
     __ LoadRoot(t0, Heap::kUndefinedValueRootIndex);
-  }
-  __ addiu(sp, sp, -count * kPointerSize);
-  for (int i = 0; i < count; i++) {
-    __ sw(t0, MemOperand(sp, (count-i-1)*kPointerSize));
+    __ addiu(sp, sp, -count * kPointerSize);
+    for (int i = 0; i < count; i++) {
+      __ sw(t0, MemOperand(sp, (count-i-1)*kPointerSize));
+    }
   }
 }
 
@@ -144,12 +149,16 @@ void VirtualFrame::CallStub(CodeStub* stub, Result* arg0, Result* arg1) {
 
 
 void VirtualFrame::CallRuntime(Runtime::Function* f, int arg_count) {
-  UNIMPLEMENTED_MIPS();
+  PrepareForCall(arg_count, arg_count);
+  ASSERT(cgen()->HasValidEntryRegisters());
+  __ CallRuntime(f, arg_count);
 }
 
 
 void VirtualFrame::CallRuntime(Runtime::FunctionId id, int arg_count) {
-  UNIMPLEMENTED_MIPS();
+  PrepareForCall(arg_count, arg_count);
+  ASSERT(cgen()->HasValidEntryRegisters());
+  __ CallRuntime(id, arg_count);
 }
 
 
@@ -171,16 +180,37 @@ void VirtualFrame::InvokeBuiltin(Builtins::JavaScript id,
 }
 
 
-void VirtualFrame::RawCallCodeObject(Handle<Code> code,
-                                       RelocInfo::Mode rmode) {
-  UNIMPLEMENTED_MIPS();
-}
-
-
 void VirtualFrame::CallCodeObject(Handle<Code> code,
                                   RelocInfo::Mode rmode,
                                   int dropped_args) {
-  UNIMPLEMENTED_MIPS();
+  switch (code->kind()) {
+    case Code::CALL_IC:
+      break;
+    case Code::FUNCTION:
+      UNIMPLEMENTED_MIPS();
+      break;
+    case Code::KEYED_LOAD_IC:
+      UNIMPLEMENTED_MIPS();
+      break;
+    case Code::LOAD_IC:
+      UNIMPLEMENTED_MIPS();
+      break;
+    case Code::KEYED_STORE_IC:
+      UNIMPLEMENTED_MIPS();
+      break;
+    case Code::STORE_IC:
+      UNIMPLEMENTED_MIPS();
+      break;
+    case Code::BUILTIN:
+      UNIMPLEMENTED_MIPS();
+      break;
+    default:
+      UNREACHABLE();
+      break;
+  }
+  Forget(dropped_args);
+  ASSERT(cgen()->HasValidEntryRegisters());
+  __ Call(code, rmode);
 }
 
 
