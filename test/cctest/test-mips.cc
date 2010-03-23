@@ -26,45 +26,22 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#ifndef V8_MIPS_CODEGEN_MIPS_INL_H_
-#define V8_MIPS_CODEGEN_MIPS_INL_H_
+#include "v8.h"
+#include "execution.h"
 
-namespace v8 {
-namespace internal {
+#include "cctest.h"
 
-#define __ ACCESS_MASM(masm_)
+using ::v8::Local;
+using ::v8::String;
+using ::v8::Script;
 
-// Platform-specific inline functions.
+TEST(MIPS_function_calls) {
+  v8::HandleScope scope;
+  LocalContext env;  // from cctest.h
 
-void DeferredCode::Jump() {
-  __ b(&entry_label_);
-  __ nop();
+  const char* c_source = "function foo() { return 0x1234; }; foo();";
+  ::v8::Local<String> source = ::v8::String::New(c_source);
+  ::v8::Local<Script> script = ::v8::Script::Compile(source);
+  CHECK_EQ(0x1234,  script->Run()->Int32Value());
 }
-
-
-void Reference::GetValueAndSpill() {
-  GetValue();
-}
-
-
-void CodeGenerator::VisitAndSpill(Statement* statement) {
-  Visit(statement);
-}
-
-
-void CodeGenerator::VisitStatementsAndSpill(ZoneList<Statement*>* statements) {
-  VisitStatements(statements);
-}
-
-
-void CodeGenerator::LoadAndSpill(Expression* expression) {
-  Load(expression);
-}
-
-
-#undef __
-
-} }  // namespace v8::internal
-
-#endif  // V8_MIPS_CODEGEN_MIPS_INL_H_
 

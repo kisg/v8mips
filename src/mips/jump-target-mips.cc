@@ -72,7 +72,7 @@ void JumpTarget::DoJump() {
     }
   }
   __ b(&entry_label_);
-  __ nop(); // NOP_ADDED
+  __ nop();   // Branch delay slot nop.
 }
 
 
@@ -137,7 +137,6 @@ void BreakTarget::Jump(Result* arg) {
 
 
 void BreakTarget::Bind() {
-  UNIMPLEMENTED_MIPS();
 #ifdef DEBUG
   // All the forward-reaching frames should have been adjusted at the
   // jumps to this target.

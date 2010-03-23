@@ -74,12 +74,9 @@ void CallIC::GenerateNormal(MacroAssembler* masm, int argc) {
 
 void CallIC::GenerateMiss(MacroAssembler* masm, int argc) {
   UNIMPLEMENTED_MIPS();
-    // ********** State **********
-    // * Registers:
+    // Registers:
     // a2: name
     // ra: return address
-    // ***************************
-
 
   // Get the receiver of the function from the stack.
   __ lw(a3, MemOperand(sp, argc*kPointerSize));
@@ -95,7 +92,6 @@ void CallIC::GenerateMiss(MacroAssembler* masm, int argc) {
 
   CEntryStub stub(1);
   __ CallStub(&stub);
-  __ nop();
 
   // Move result to r1 and leave the internal frame.
   __ mov(a1, v0);
@@ -106,12 +102,9 @@ void CallIC::GenerateMiss(MacroAssembler* masm, int argc) {
   __ lw(a2, MemOperand(sp, argc * kPointerSize));
   __ andi(t0, a2, kSmiTagMask);
   __ Branch(eq, &invoke, t0, Operand(zero_reg));
-  __ nop(); // NOP_ADDED
   __ GetObjectType(a2, a3, a3);
   __ Branch(eq, &global, a3, Operand(JS_GLOBAL_OBJECT_TYPE));
-  __ nop(); // NOP_ADDED
   __ Branch(ne, &invoke, a3, Operand(JS_BUILTINS_OBJECT_TYPE));
-  __ nop(); // NOP_ADDED
 
   // Patch the receiver on the stack.
   __ bind(&global);
@@ -122,7 +115,6 @@ void CallIC::GenerateMiss(MacroAssembler* masm, int argc) {
   ParameterCount actual(argc);
   __ bind(&invoke);
   __ InvokeFunction(a1, actual, JUMP_FUNCTION);
-  __ nop(); // NOP_ADDED
 }
 
 // Defined in ic.cc.
