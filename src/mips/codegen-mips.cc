@@ -320,9 +320,15 @@ MemOperand CodeGenerator::SlotOperand(Slot* slot, Register tmp) {
   ASSERT(slot != NULL);
   int index = slot->index();
   switch (slot->type()) {
+<<<<<<< HEAD:src/mips/codegen-mips.cc
 
     case Slot::PARAMETER:
       return frame_->ParameterAt(index);
+=======
+    case Slot::PARAMETER:
+      UNIMPLEMENTED_MIPS();
+      return MemOperand(no_reg, 0);
+>>>>>>> MIPS simple function calls:src/mips/codegen-mips.cc
 
     case Slot::LOCAL:
       return frame_->LocalAt(index);
@@ -652,8 +658,8 @@ void CodeGenerator::VisitFunctionLiteral(FunctionLiteral* node) {
 }
 
 
-void CodeGenerator::VisitFunctionBoilerplateLiteral(
-    FunctionBoilerplateLiteral* node) {
+void CodeGenerator::VisitSharedFunctionInfoLiteral(
+    SharedFunctionInfoLiteral* node) {
   UNIMPLEMENTED_MIPS();
 }
 
@@ -1049,6 +1055,7 @@ Reference::Reference(CodeGenerator* cgen,
 
 Reference::~Reference() {
   ASSERT(is_unloaded() || is_illegal());
+<<<<<<< HEAD:src/mips/codegen-mips.cc
 }
 
 
@@ -1100,6 +1107,59 @@ void Reference::GetValue() {
 }
 
 
+=======
+}
+
+
+Handle<String> Reference::GetName() {
+  ASSERT(type_ == NAMED);
+  Property* property = expression_->AsProperty();
+  if (property == NULL) {
+    // Global variable reference treated as a named property reference.
+    VariableProxy* proxy = expression_->AsVariableProxy();
+    ASSERT(proxy->AsVariable() != NULL);
+    ASSERT(proxy->AsVariable()->is_global());
+    return proxy->name();
+  } else {
+    Literal* raw_name = property->key()->AsLiteral();
+    ASSERT(raw_name != NULL);
+    return Handle<String>(String::cast(*raw_name->handle()));
+  }
+}
+
+
+void Reference::GetValue() {
+  ASSERT(cgen_->HasValidEntryRegisters());
+  ASSERT(!is_illegal());
+  ASSERT(!cgen_->has_cc());
+  Property* property = expression_->AsProperty();
+  if (property != NULL) {
+    cgen_->CodeForSourcePosition(property->position());
+  }
+
+  switch (type_) {
+    case SLOT: {
+      UNIMPLEMENTED_MIPS();
+      break;
+    }
+
+    case NAMED: {
+      UNIMPLEMENTED_MIPS();
+      break;
+    }
+
+    case KEYED: {
+      UNIMPLEMENTED_MIPS();
+      break;
+    }
+
+    default:
+      UNREACHABLE();
+  }
+}
+
+
+>>>>>>> MIPS simple function calls:src/mips/codegen-mips.cc
 void Reference::SetValue(InitState init_state) {
   ASSERT(!is_illegal());
   ASSERT(!cgen_->has_cc());
