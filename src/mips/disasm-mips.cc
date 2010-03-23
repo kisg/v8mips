@@ -97,7 +97,7 @@ class Decoder {
 
   // Printing of common values.
   void PrintRegister(int reg);
-  void PrintCRegister(int creg);
+  void PrintFPURegister(int freg);
   void PrintRs(Instruction* instr);
   void PrintRt(Instruction* instr);
   void PrintRd(Instruction* instr);
@@ -117,7 +117,7 @@ class Decoder {
 
   // Handle formatting of instructions and their options.
   int FormatRegister(Instruction* instr, const char* option);
-  int FormatCRegister(Instruction* instr, const char* option);
+  int FormatFPURegister(Instruction* instr, const char* option);
   int FormatOption(Instruction* instr, const char* option);
   void Format(Instruction* instr, const char* format);
   void Unknown(Instruction* instr);
@@ -181,27 +181,27 @@ void Decoder::PrintRd(Instruction* instr) {
 }
 
 
-// Print the Cregister name according to the active name converter.
-void Decoder::PrintCRegister(int creg) {
-  Print(converter_.NameOfXMMRegister(creg));
+// Print the FPUregister name according to the active name converter.
+void Decoder::PrintFPURegister(int freg) {
+  Print(converter_.NameOfXMMRegister(freg));
 }
 
 
 void Decoder::PrintFs(Instruction* instr) {
-  int creg = instr->RsField();
-  PrintCRegister(creg);
+  int freg = instr->RsField();
+  PrintFPURegister(freg);
 }
 
 
 void Decoder::PrintFt(Instruction* instr) {
-  int creg = instr->RtField();
-  PrintCRegister(creg);
+  int freg = instr->RtField();
+  PrintFPURegister(freg);
 }
 
 
 void Decoder::PrintFd(Instruction* instr) {
-  int creg = instr->RdField();
-  PrintCRegister(creg);
+  int freg = instr->RdField();
+  PrintFPURegister(freg);
 }
 
 
@@ -300,21 +300,21 @@ int Decoder::FormatRegister(Instruction* instr, const char* format) {
 }
 
 
-// Handle all Cregister based formatting in this function to reduce the
+// Handle all FPUregister based formatting in this function to reduce the
 // complexity of FormatOption.
-int Decoder::FormatCRegister(Instruction* instr, const char* format) {
+int Decoder::FormatFPURegister(Instruction* instr, const char* format) {
   ASSERT(format[0] == 'f');
   if (format[1] == 's') {  // 'fs: fs register
-    int reg = instr->RsField();
-    PrintCRegister(reg);
+    int reg = instr->FsField();
+    PrintFPURegister(reg);
     return 2;
   } else if (format[1] == 't') {  // 'ft: ft register
-    int reg = instr->RtField();
-    PrintCRegister(reg);
+    int reg = instr->FtField();
+    PrintFPURegister(reg);
     return 2;
   } else if (format[1] == 'd') {  // 'fd: fd register
-    int reg = instr->RdField();
-    PrintCRegister(reg);
+    int reg = instr->FdField();
+    PrintFPURegister(reg);
     return 2;
   }
   UNREACHABLE();
@@ -357,8 +357,8 @@ int Decoder::FormatOption(Instruction* instr, const char* format) {
     case 'r': {   // 'r: registers
       return FormatRegister(instr, format);
     }
-    case 'f': {   // 'f: Cregisters
-      return FormatCRegister(instr, format);
+    case 'f': {   // 'f: FPUregisters
+      return FormatFPURegister(instr, format);
     }
     case 's': {   // 'sa
       ASSERT(STRING_STARTS_WITH(format, "sa"));
@@ -403,19 +403,52 @@ void Decoder::DecodeTypeRegister(Instruction* instr) {
           UNREACHABLE();
           break;
         case MFC1:
-          Format(instr, "mfc1 'rt, 'fs");
+          Format(instr, "mfc1   'rt, 'fs");
           break;
         case MFHC1:
-          Format(instr, "mfhc1  rt, 'fs");
+          Format(instr, "mfhc1  'rt, 'fs");
           break;
         case MTC1:
-          Format(instr, "mtc1 'rt, 'fs");
+          Format(instr, "mtc1   'rt, 'fs");
           break;
         case MTHC1:
-          Format(instr, "mthc1  rt, 'fs");
+          Format(instr, "mthc1  'rt, 'fs");
+          break;
+        case D:
+          switch (instr->FunctionFieldRaw()) {
+            case ADD_D:
+              Format(instr, "add.d  'fd, 'fs, 'ft");
+              break;
+            case SUB_D:
+              Format(instr, "sub.d  'fd, 'fs, 'ft");
+              break;
+            case MUL_D:
+              Format(instr, "mul.d  'fd, 'fs, 'ft");
+              break;
+            case DIV_D:
+              Format(instr, "div.d  'fd, 'fs, 'ft");
+              break;
+            case ABS_D:
+              Format(instr, "abs.d  'fd, 'fs");
+              break;
+            case MOV_D:
+              Format(instr, "mov.d  'fd, 'fs");
+              break;
+            case NEG_D:
+              Format(instr, "neg.d  'fd, 'fs");
+              break;
+            case CVT_W_D:
+              Format(instr, "cvt.w.d 'fd, 'fs");
+              break;
+            case CVT_L_D:
+            case CVT_S_D:
+              UNIMPLEMENTED_MIPS();
+              break;
+            default:
+              UNREACHABLE();
+          };
           break;
         case S:
-        case D:
           UNIMPLEMENTED_MIPS();
           break;
         case W:
@@ -424,7 +457,7 @@ void Decoder::DecodeTypeRegister(Instruction* instr) {
               UNIMPLEMENTED_MIPS();
               break;
             case CVT_D_W:   // Convert word to double.
-              Format(instr, "cvt.d.w  'fd, 'fs");
+              Format(instr, "cvt.d.w 'fd, 'fs");
               break;
             default:
               UNREACHABLE();
@@ -433,7 +466,6 @@ void Decoder::DecodeTypeRegister(Instruction* instr) {
         case L:
         case PS:
           UNIMPLEMENTED_MIPS();
-          break;
           break;
         default:
           UNREACHABLE();
@@ -643,10 +675,10 @@ void Decoder::DecodeTypeImmediate(Instruction* instr) {
       Format(instr, "ldc1   'ft, 'imm16s('rs)");
       break;
     case SWC1:
-      Format(instr, "swc1   'rt, 'imm16s('fs)");
+      Format(instr, "swc1   'ft, 'imm16s('rs)");
       break;
     case SDC1:
-      Format(instr, "sdc1   'rt, 'imm16s('fs)");
+      Format(instr, "sdc1   'ft, 'imm16s('rs)");
       break;
     default:
       UNREACHABLE();
@@ -758,9 +790,8 @@ int Disassembler::InstructionDecode(v8::internal::Vector<char> buffer,
   return d.InstructionDecode(instruction);
 }
 
-
+// The MIPS assembler does not currently use constant pools.
 int Disassembler::ConstantPoolSizeAt(byte_* instruction) {
-  UNIMPLEMENTED_MIPS();
   return -1;
 }
 
