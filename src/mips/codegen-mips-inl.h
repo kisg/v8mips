@@ -42,6 +42,19 @@ void DeferredCode::Jump() {
 }
 
 
+void DeferredCode::Branch(Condition cond, Register src1, const Operand& src2) {
+  __ Branch(cond, &entry_label_, src1, src2);
+}
+
+
+void CodeGenerator::LoadConditionAndSpill(Expression* expression,
+                                          JumpTarget* true_target,
+                                          JumpTarget* false_target,
+                                          bool force_control) {
+  LoadCondition(expression, true_target, false_target, force_control);
+}
+
+
 void Reference::GetValueAndSpill() {
   GetValue();
 }
@@ -60,7 +73,6 @@ void CodeGenerator::VisitStatementsAndSpill(ZoneList<Statement*>* statements) {
 void CodeGenerator::LoadAndSpill(Expression* expression) {
   Load(expression);
 }
-
 
 #undef __
 
