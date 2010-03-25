@@ -119,8 +119,14 @@ class JumpTarget : public ZoneObject {  // Shadows are dynamically allocated.
   virtual void Branch(Condition cc, Hint hint = no_hint);
   virtual void Branch(Condition cc, Result* arg, Hint hint = no_hint);
 #else
-  virtual void Branch(Condition cc, Hint hint = no_hint, Register src1 = zero_reg, const Operand& src2 = Operand(zero_reg));
-  virtual void Branch(Condition cc, Result* arg, Hint hint = no_hint, Register src1 = zero_reg, const Operand& src2 = Operand(zero_reg));
+  virtual void Branch(Condition cc,
+                      Register src1 = zero_reg,
+                      const Operand& src2 = Operand(zero_reg),
+                      Hint hint = no_hint);
+  virtual void Branch(Condition cc, Result* arg,
+                      Register src1 = zero_reg,
+                      const Operand& src2 = Operand(zero_reg),
+                      Hint hint = no_hint);
 #endif
 
   // Bind a jump target.  If there is no current frame at the binding
@@ -163,7 +169,8 @@ class JumpTarget : public ZoneObject {  // Shadows are dynamically allocated.
 #ifndef V8_TARGET_ARCH_MIPS
   void DoBranch(Condition cc, Hint hint);
 #else
-  void DoBranch(Condition cc, Hint hint, Register src1 = zero_reg, const Operand& src2 = Operand(zero_reg));
+  void DoBranch(Condition cc, Hint hint,
+      Register src1 = zero_reg, const Operand& src2 = Operand(zero_reg));
 #endif
   void DoBind();
 
@@ -225,10 +232,14 @@ class BreakTarget : public JumpTarget {
   virtual void Branch(Condition cc, Hint hint = no_hint);
   virtual void Branch(Condition cc, Result* arg, Hint hint = no_hint);
 #else
-  virtual void Branch(Condition cc, Hint hint = no_hint,
-      Register src1 = zero_reg, const Operand& src2 = Operand(zero_reg));
-  virtual void Branch(Condition cc, Result* arg, Hint hint = no_hint,
-      Register src1 = zero_reg, const Operand& src2 = Operand(zero_reg));
+  virtual void Branch(Condition cc,
+                      Register src1 = zero_reg,
+                      const Operand& src2 = Operand(zero_reg),
+                      Hint hint = no_hint);
+  virtual void Branch(Condition cc, Result* arg,
+                      Register src1 = zero_reg,
+                      const Operand& src2 = Operand(zero_reg),
+                      Hint hint = no_hint);
 #endif
 
   // Bind a break target.  If there is no current frame at the binding

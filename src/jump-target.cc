@@ -260,7 +260,7 @@ void JumpTarget::Branch(Condition cc, Hint hint) {
   DoBranch(cc, hint);
 }
 #else
-void JumpTarget::Branch(Condition cc, Hint hint, Register src1, const Operand& src2) {
+void JumpTarget::Branch(Condition cc, Register src1, const Operand& src2, Hint hint) {
   DoBranch(cc, hint, src1, src2);
 }
 #endif
@@ -296,7 +296,8 @@ void JumpTarget::Branch(Condition cc, Result* arg, Hint hint) {
   ASSERT_ARGCHECK(arg);
 }
 #else
-void JumpTarget::Branch(Condition cc, Result* arg, Hint hint, Register src1, const Operand& src2) {
+void JumpTarget::Branch(Condition cc, Result* arg,
+    Register src1, const Operand& src2, Hint hint) {
   ASSERT(cgen()->has_valid_frame());
 
   // We want to check that non-frame registers at the call site stay in
@@ -336,8 +337,8 @@ void BreakTarget::Branch(Condition cc, Result* arg, Hint hint) {
   }
 }
 #else
-void BreakTarget::Branch(Condition cc, Result* arg, Hint hint,
-    Register src1, const Operand& src2) {
+void BreakTarget::Branch(Condition cc, Result* arg,
+    Register src1, const Operand& src2, Hint hint) {
   ASSERT(cgen()->has_valid_frame());
 
   int count = cgen()->frame()->height() - expected_height_;
@@ -348,7 +349,8 @@ void BreakTarget::Branch(Condition cc, Result* arg, Hint hint,
     JumpTarget fall_through;
     // Branch to fall through will not negate, because it is a
     // forward-only target.
-    fall_through.Branch(NegateCondition(cc), NegateHint(hint), src1, src2);
+    fall_through.Branch(NegateCondition(cc), src1, src2, NegateHint(hint));
+>>>>>>> Added MIPS support for JumpTarget Branches.:src/jump-target.cc
     Jump(arg);  // May emit merge code here.
     fall_through.Bind();
   } else {
@@ -432,6 +434,8 @@ void BreakTarget::Branch(Condition cc, Hint hint) {
 }
 #else
 void BreakTarget::Branch(Condition cc, Hint hint, Register src1, const Operand& src2) {
+void BreakTarget::Branch(Condition cc, Register src1, const Operand& src2,
+    Hint hint) {
   ASSERT(cgen()->has_valid_frame());
 
   int count = cgen()->frame()->height() - expected_height_;
@@ -442,7 +446,7 @@ void BreakTarget::Branch(Condition cc, Hint hint, Register src1, const Operand& 
     JumpTarget fall_through;
     // Branch to fall through will not negate, because it is a
     // forward-only target.
-    fall_through.Branch(NegateCondition(cc), NegateHint(hint), src1, src2);
+    fall_through.Branch(NegateCondition(cc), src1, src2, NegateHint(hint));
     Jump();  // May emit merge code here.
     fall_through.Bind();
   } else {
