@@ -228,10 +228,6 @@ class CodeGenerator: public AstVisitor {
   // expected arguments. Otherwise return -1.
   static int InlineRuntimeCallArgumentsCount(Handle<String> name);
 
-  // If the name is an inline runtime function call return the number of
-  // expected arguments. Otherwise return -1.
-  static int InlineRuntimeCallArgumentsCount(Handle<String> name);
-
  private:
   // Construction/Destruction.
   explicit CodeGenerator(MacroAssembler* masm);

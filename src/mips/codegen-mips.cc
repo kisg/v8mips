@@ -164,11 +164,7 @@ void CodeGenerator::Generate(CompilationInfo* info) {
       // context location and thus the last value is what is seen inside
       // the function.
       for (int i = 0; i < scope()->num_parameters(); i++) {
-        Variable* par = scope()->parameter(i);
-        Slot* slot = par->slot();
-        if (slot != NULL && slot->type() == Slot::CONTEXT) {
-          UNIMPLEMENTED_MIPS();
-        }
+        UNIMPLEMENTED_MIPS();
       }
     }
 
@@ -320,24 +316,14 @@ MemOperand CodeGenerator::SlotOperand(Slot* slot, Register tmp) {
   ASSERT(slot != NULL);
   int index = slot->index();
   switch (slot->type()) {
-<<<<<<< HEAD:src/mips/codegen-mips.cc
-
     case Slot::PARAMETER:
       return frame_->ParameterAt(index);
-=======
-    case Slot::PARAMETER:
-      UNIMPLEMENTED_MIPS();
-      return MemOperand(no_reg, 0);
->>>>>>> MIPS simple function calls:src/mips/codegen-mips.cc
-
     case Slot::LOCAL:
       return frame_->LocalAt(index);
-
     case Slot::CONTEXT: {
       UNIMPLEMENTED_MIPS();
       return MemOperand(no_reg, 0);
     }
-
     default:
       UNREACHABLE();
       return MemOperand(no_reg, 0);
@@ -1055,7 +1041,6 @@ Reference::Reference(CodeGenerator* cgen,
 
 Reference::~Reference() {
   ASSERT(is_unloaded() || is_illegal());
-<<<<<<< HEAD:src/mips/codegen-mips.cc
 }
 
 
@@ -1107,59 +1092,6 @@ void Reference::GetValue() {
 }
 
 
-=======
-}
-
-
-Handle<String> Reference::GetName() {
-  ASSERT(type_ == NAMED);
-  Property* property = expression_->AsProperty();
-  if (property == NULL) {
-    // Global variable reference treated as a named property reference.
-    VariableProxy* proxy = expression_->AsVariableProxy();
-    ASSERT(proxy->AsVariable() != NULL);
-    ASSERT(proxy->AsVariable()->is_global());
-    return proxy->name();
-  } else {
-    Literal* raw_name = property->key()->AsLiteral();
-    ASSERT(raw_name != NULL);
-    return Handle<String>(String::cast(*raw_name->handle()));
-  }
-}
-
-
-void Reference::GetValue() {
-  ASSERT(cgen_->HasValidEntryRegisters());
-  ASSERT(!is_illegal());
-  ASSERT(!cgen_->has_cc());
-  Property* property = expression_->AsProperty();
-  if (property != NULL) {
-    cgen_->CodeForSourcePosition(property->position());
-  }
-
-  switch (type_) {
-    case SLOT: {
-      UNIMPLEMENTED_MIPS();
-      break;
-    }
-
-    case NAMED: {
-      UNIMPLEMENTED_MIPS();
-      break;
-    }
-
-    case KEYED: {
-      UNIMPLEMENTED_MIPS();
-      break;
-    }
-
-    default:
-      UNREACHABLE();
-  }
-}
-
-
->>>>>>> MIPS simple function calls:src/mips/codegen-mips.cc
 void Reference::SetValue(InitState init_state) {
   ASSERT(!is_illegal());
   ASSERT(!cgen_->has_cc());
@@ -1232,6 +1164,7 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
                               Label* throw_out_of_memory_exception,
                               bool do_gc,
                               bool always_allocate) {
+  // v0: result parameter for PerformGC, if any
   // s0: number of arguments including receiver (C callee-saved)
   // s1: pointer to the first argument          (C callee-saved)
   // s2: pointer to builtin function            (C callee-saved)
@@ -1299,7 +1232,8 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
   __ b(throw_normal_exception);
   __ nop();   // Branch delay slot nop.
 
-  __ bind(&retry);  // pass last failure (r0) as parameter (r0) when retrying
+  __ bind(&retry);  // pass last failure (v0) as parameter (a0) when retrying
+  __ mov(a0, v0);
 }
 
 void CEntryStub::Generate(MacroAssembler* masm) {
