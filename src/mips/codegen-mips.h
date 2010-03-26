@@ -320,6 +320,11 @@ class CodeGenerator: public AstVisitor {
                     bool reversed,
                     OverwriteMode mode);
 
+  void Comparison(Condition cc,
+                  Expression* left,
+                  Expression* right,
+                  bool strict = false);
+
   // Control flow
   void Branch(bool if_true, JumpTarget* target);
   
