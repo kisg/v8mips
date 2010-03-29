@@ -349,8 +349,7 @@ void BreakTarget::Branch(Condition cc, Result* arg,
     JumpTarget fall_through;
     // Branch to fall through will not negate, because it is a
     // forward-only target.
-    fall_through.Branch(NegateCondition(cc), src1, Operand(src2),
-        NegateHint(hint));
+    fall_through.Branch(NegateCondition(cc), src1, src2, NegateHint(hint));
     Jump(arg);  // May emit merge code here.
     fall_through.Bind();
   } else {
@@ -445,8 +444,7 @@ void BreakTarget::Branch(Condition cc, Register src1, const Operand& src2,
     JumpTarget fall_through;
     // Branch to fall through will not negate, because it is a
     // forward-only target.
-    fall_through.Branch(NegateCondition(cc), src1, Operand(src2),
-        NegateHint(hint));
+    fall_through.Branch(NegateCondition(cc), src1, src2, NegateHint(hint));
     Jump();  // May emit merge code here.
     fall_through.Bind();
   } else {
