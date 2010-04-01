@@ -335,6 +335,7 @@ class CodeGenerator: public AstVisitor {
 
   // Control flow
   void Branch(bool if_true, JumpTarget* target);
+  void CheckStack();
 
   struct InlineRuntimeLUT {
     void (CodeGenerator::*method)(ZoneList<Expression*>*);
