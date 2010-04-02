@@ -177,9 +177,9 @@ void VirtualFrame::CallAlignedRuntime(Runtime::FunctionId id, int arg_count) {
 
 void VirtualFrame::InvokeBuiltin(Builtins::JavaScript id,
                                  InvokeJSFlags flags,
-                                 Result* arg_count_register,
                                  int arg_count) {
-  UNIMPLEMENTED_MIPS();
+  Forget(arg_count);
+  __ InvokeBuiltin(id, flags);
 }
 
 
