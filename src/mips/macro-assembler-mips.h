@@ -37,8 +37,13 @@ namespace internal {
 // Forward declaration.
 class JumpTarget;
 
-// Register at is used for instruction generation. So it is not safe to use it
-// unless we know exactly what we do. Therefore we create another scratch reg.
+// Register at is used for instruction generation. So it is not always safe to
+// use it. Instead t8 and t9 registers are used by the MacroAssembler when
+// necessary.
+// The programmer should know that the MacroAssembler may clobber these two,
+// but won't touch other registers except in special cases.
+
+// Unless we know exactly what we do. Therefore we create another scratch reg.
 const Register ip = t8;  // Alias ip (equivalent to arm ip scratch register).
 
 // Registers aliases
@@ -366,8 +371,8 @@ class MacroAssembler: public Assembler {
     lw(dst, MemOperand(sp, 0));
     Addu(sp, sp, Operand(kPointerSize));
   }
-  void Pop() {
-    Add(sp, sp, Operand(kPointerSize));
+  void Pop(uint32_t count = 1) {
+    Add(sp, sp, Operand(count * kPointerSize));
   }
 
 
@@ -376,6 +381,9 @@ class MacroAssembler: public Assembler {
 
   void EnterInternalFrame() { EnterFrame(StackFrame::INTERNAL); }
   void LeaveInternalFrame() { LeaveFrame(StackFrame::INTERNAL); }
+
+  void EnterConstructFrame() { EnterFrame(StackFrame::CONSTRUCT); }
+  void LeaveConstructFrame() { LeaveFrame(StackFrame::CONSTRUCT); }
 
   // Enter specific kind of exit frame; either EXIT or
   // EXIT_DEBUG. Expects the number of arguments in register a0 and
@@ -437,6 +445,7 @@ class MacroAssembler: public Assembler {
 
   // Push a new try handler and link into try handler chain.
   // The return address must be passed in register ra.
+  // Clobber t0, t1, t2.
   void PushTryHandler(CodeLocation try_location, HandlerType type);
 
   // Unlink the stack handler on top of the stack from the try handler chain.
@@ -446,6 +455,16 @@ class MacroAssembler: public Assembler {
 
   // ---------------------------------------------------------------------------
   // Support functions.
+
+  // Try to get function prototype of a function and puts the value in
+  // the result register. Checks that the function really is a
+  // function and jumps to the miss label if the fast checks fail. The
+  // function register will be untouched; the other registers may be
+  // clobbered.
+  void TryGetFunctionPrototype(Register function,
+                               Register result,
+                               Register scratch,
+                               Label* miss);
 
   void GetObjectType(Register function,
                      Register map,
@@ -591,7 +610,6 @@ class MacroAssembler: public Assembler {
   Handle<Code> ResolveBuiltin(Builtins::JavaScript id, bool* resolved);
 
   // Activation support.
-  // EnterFrame clobbers t0 and t1.
   void EnterFrame(StackFrame::Type type);
   void LeaveFrame(StackFrame::Type type);
 };

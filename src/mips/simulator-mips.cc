@@ -51,7 +51,7 @@ using ::v8::internal::DeleteArray;
 
 // Utils functions
 bool HaveSameSign(int32_t a, int32_t b) {
-  return ((a ^ b) > 0);
+  return ((a ^ b) >= 0);
 }
 
 
@@ -806,7 +806,7 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
     // This is dodgy but it works because the C entry stubs are never moved.
     // See comment in codegen-arm.cc and bug 1242173.
     int32_t saved_ra = get_register(ra);
-    
+
     intptr_t external =
         reinterpret_cast<int32_t>(redirection->external_function());
     SimulatorRuntimeCall target =
@@ -823,9 +823,9 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
     }
 
     // Based on CpuFeatures::IsSupported(FPU), Mips will use either hardware
-    // FPU, or gcc soft-float routines. Hardware FPU is simulated in this 
+    // FPU, or gcc soft-float routines. Hardware FPU is simulated in this
     // simulator. Soft-float has additional abstraction of ExternalReference,
-    // to support serialization. Finally, when simulated on x86 host, the 
+    // to support serialization. Finally, when simulated on x86 host, the
     // x86 softfloat routines are used, and this Redirection infrastructure
     // lets simulated-mips make calls into x86 C code.
     // When doing that, the 'double' return type must be handled differently
@@ -882,8 +882,8 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
   int32_t  fs_reg = instr->FsField();
   int32_t  ft_reg = instr->FtField();
   int32_t  fd_reg = instr->FdField();
-  int64_t  i64hilo;
-  uint64_t u64hilo;
+  int64_t  i64hilo = 0;
+  uint64_t u64hilo = 0;
 
   // ALU output
   // It should not be used as is. Instructions using it should always initialize
@@ -1055,17 +1055,21 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
       break;
     case SPECIAL3:
       switch (instr->FunctionFieldRaw()) {
-        case INS: { // mips32r2 instruction.
-            uint16_t msb = rd_reg;  // Interpret Rd field as 5-bit msb of insert.
-            uint16_t lsb = sa;      // Interpret sa field as 5-bit lsb of insert.
+        case INS: {   // mips32r2 instruction.
+            // Interpret Rd field as 5-bit msb of insert.
+            uint16_t msb = rd_reg;
+            // Interpret sa field as 5-bit lsb of insert.
+            uint16_t lsb = sa;
             uint16_t size = msb - lsb + 1;
             uint16_t mask = (1 << size) - 1;
             alu_out = (rt_u & ~(mask << lsb)) | ((rs_u & mask) << lsb);
           }
           break;
-        case EXT: { // mips32r2 instruction.
-            uint16_t msb = rd_reg;  // Interpret Rd field as 5-bit msb of extract.
-            uint16_t lsb = sa;      // Interpret sa field as 5-bit lsb of extract.
+        case EXT: {   // mips32r2 instruction.
+            // Interpret Rd field as 5-bit msb of extract.
+            uint16_t msb = rd_reg;
+            // Interpret sa field as 5-bit lsb of extract.
+            uint16_t lsb = sa;
             uint16_t size = msb - lsb + 1;
             uint16_t mask = (1 << size) - 1;
             alu_out = (rs_u & (mask << lsb)) >> lsb;
@@ -1250,7 +1254,7 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
           set_register(LO, Unpredictable);
           set_register(HI, Unpredictable);
           break;
-        default: // For other special2 opcodes we do the default operation.
+        default:  // For other special2 opcodes we do the default operation.
           set_register(rd_reg, alu_out);
       }
       break;

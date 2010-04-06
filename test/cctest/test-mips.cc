@@ -45,13 +45,13 @@ TEST(MIPSFunctionCalls) {
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
 
-  const char* c_source = ""
+  const char* c_source =
     "function foo(arg1, arg2, arg3, arg4, arg5) {"
-    "	return foo2(arg1, foo2(arg3, arg4));"
+    "  return foo2(arg1, foo2(arg3, arg4));"
     "}"
     ""
     "function foo2(arg1, arg2) {"
-    "	return arg2;"
+    "  return arg2;"
     "}"
     // We call the function twice because it needs more code.
     // TODO(MIPS): Detail what more is needed.
@@ -72,7 +72,8 @@ TEST(MIPSComparisons) {
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
 
-  const char* c_source = ""
+  // The "instanceof" statement is tested with objects in MIPSObjects.
+  const char* c_source =
     "function foo() {"
     ""
     "  var nothing;"
@@ -106,26 +107,31 @@ TEST(MIPSGlobalVariables) {
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
 
-  const char* c_source = ""
+  const char* c_source =
     "var nothing;"
     "var n = 1234;"
     "var s = '1234';"
     "var bt = true;"
     "var bf = false;"
     ""
+    "var a = 0x0;"
+    "var b = 0x123;"
+    ""
     "if (nothing == null)"
     "if (typeof n == 'number')"
     "if (typeof s == 'string')"
     "if (typeof bt == 'boolean')"
-    "if (typeof bf == 'boolean')"
-    "    1234;";
+    "if (typeof bf == 'boolean') {"
+    "  a = b;"
+    "  a;"
+    "}";
   Local<String> source = ::v8::String::New(c_source);
   Local<Script> script = ::v8::Script::Compile(source);
-  CHECK_EQ(1234, script->Run()->Int32Value());
+  CHECK_EQ(0x123, script->Run()->Int32Value());
 }
 
 
-TEST(MIPSIfThenElse) {
+TEST(MIPSControlFlow) {
   // Disable compilation of natives.
   i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
@@ -133,24 +139,203 @@ TEST(MIPSIfThenElse) {
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
 
-  const char* c_source = ""
-    "if (1 < 9) {"
+  const char* c_source =
+    "var res = 0;"
+    "var count = 100;"
+    ""
+    "if (1 < 9)"
     "  if (555 <= 555)"
     "    if (999 > 998)"
     "      if (0 >= 0)"
-    "        0x1111;"
-    "} else {"
-    "  0x4444;"
-    "}";
+    "        res = 0xa;"
+    ""
+    "while (count > 90) {"
+    "  count = count - 1;"
+    "  res = res + 0x10;"
+    "}"
+    ""
+    "do {"
+    "  count = count - 1;"
+    "  res = res + 0x100;"
+    "} while (count > 80);"
+    ""
+    "while (count > 60) {"
+    "  count = count - 1;"
+    "  if (count >= 70)"
+    "    continue;"
+    "  res = res + 0x1000;"
+    "}"
+    ""
+    "while (count > 40) {"
+    "  count = count - 1;"
+    "  res = res + 0x10000;"
+    "  if (count <= 50)"
+    "    break;"
+    "}"
+    ""
+    "while (count > 30) {"
+    "  switch (count) {"
+    "    case 39:"
+    "      count = count - 1;"
+    "      res = res + 0x100000;"
+    "      break;"
+    ""
+    "    case 33:"
+    "      count = count - 1;"
+    "      res = res + 0x900000;"
+    ""
+    "    default:"
+    "      count = count - 1;"
+    "  }"
+    "}"
+    ""
+    "for (var i = 0; i < 10; i = i + 1) {"
+    "  count = count - 1;"
+    "  res = res + 0x1000000;"
+    "}"
+    ""
+    "res;";
   Local<String> source = ::v8::String::New(c_source);
   Local<Script> script = ::v8::Script::Compile(source);
-  CHECK_EQ(0x1111, script->Run()->Int32Value());
+  CHECK_EQ(0xaaaaaaa, script->Run()->Int32Value());
+}
+
+
+TEST(MIPSUnaryOperations) {
+  // Disable compilation of natives.
+  i::FLAG_disable_native_files = true;
+  i::FLAG_full_compiler = false;
+  v8::HandleScope scope;
+  LocalContext env;  // from cctest.h
+
+  const char* c_source =
+    "var res = 0x1233;"
+    "var b = false;"
+    "var qwerty;"
+    ""
+    "if (!qwerty)"
+    "  res = res + 0x1;"
+    ""
+    "typeof res;"
+    ""
+    "~res;";
+  Local<String> source = ::v8::String::New(c_source);
+  Local<Script> script = ::v8::Script::Compile(source);
+  CHECK_EQ(0xffffedcb, script->Run()->Int32Value());
+}
+
+
+TEST(MIPSCountOperation) {
+  // Disable compilation of natives.
+  i::FLAG_disable_native_files = true;
+  i::FLAG_full_compiler = false;
+  v8::HandleScope scope;
+  LocalContext env;  // from cctest.h
+
+  const char* c_source =
+    "var c = 0;"
+    "for ( var i = 0; i < 50; i++)"
+    "  ++c;"
+    "c;";
+  Local<String> source = ::v8::String::New(c_source);
+  Local<Script> script = ::v8::Script::Compile(source);
+  CHECK_EQ(50, script->Run()->Int32Value());
+}
+
+
+TEST(MIPSArrays) {
+  // Disable compilation of natives.
+  i::FLAG_disable_native_files = true;
+  i::FLAG_full_compiler = false;
+  v8::HandleScope scope;
+  LocalContext env;  // from cctest.h
+
+  const char* c_source =
+    "myArray = [];"
+    "myArray[1] = 0x10;"
+    "myArray[2] = 0x20;"
+    "myArray[3] = 0x30;"
+    "myArray[2];";
+  Local<String> source = ::v8::String::New(c_source);
+  Local<Script> script = ::v8::Script::Compile(source);
+  CHECK_EQ(0x20, script->Run()->Int32Value());
+}
+
+
+TEST(MIPSObjects) {
+  // Disable compilation of natives.
+  i::FLAG_disable_native_files = true;
+  i::FLAG_full_compiler = false;
+  v8::HandleScope scope;
+  LocalContext env;  // from cctest.h
+
+  const char* c_source =
+// Global variable to store the result.
+    "var res = 0;"
+    ""
+// Constructors.
+    "function GeomObject() {}"
+    ""
+    "function Square(c_) {"
+    "  this.c = c_;"
+    "  this.retArea = getSquareArea;"
+    "  this.retPerim = function () {return 4 * this.c;}"
+    "}"
+    ""
+    "function getSquareArea() {"
+    "  return this.c * this.c;"
+    "}"
+    ""
+    "function Circle() {"
+    "  this.x = 0;"
+    "  this.y = 0;"
+    "  this.r = 0;"
+    "}"
+    ""
+    "NewGeomObject.prototype = new GeomObject;"
+    "NewGeomObject.prototype.constructor = NewGeomObject;"
+    "function NewGeomObject() {"
+    "  this.newProperty = 0xa0000;"
+    "}"
+    ""
+    "LastGeomObject.prototype = new NewGeomObject;"
+    "LastGeomObject.prototype.constructor = LastGeomObject;"
+    "function LastGeomObject() {"
+    "  this.lastProperty = 0xa00000;"
+    "}"
+    ""
+// Instantiate objects.
+    "myGeom = new GeomObject;"
+    "mySquare = new Square(0xa);"
+    "myCircle = new Circle;"
+    "myCircle2 = new Circle;"
+    "myNewObj = new NewGeomObject;"
+    "myLastObj = new LastGeomObject;"
+    ""
+// Change object prototype.
+    "GeomObject.prototype.inObj = 0xa0;"
+    ""
+// Change object properties.
+    "myCircle.r = 0xa00;"
+    "myCircle2.r = 0xa000;"
+    ""
+// Compute a result involving all previous aspects.
+    "res = res + myGeom.inObj + myCircle.r"
+    "+ myCircle2.r + myNewObj.newProperty;"
+    "if (mySquare.retArea() == 100)"
+    "  if (mySquare.retPerim() == 40)"
+    "    res = res + mySquare.c;"
+    "if (myLastObj instanceof LastGeomObject)"
+    "  res = res + myLastObj.lastProperty;";
+  Local<String> source = ::v8::String::New(c_source);
+  Local<Script> script = ::v8::Script::Compile(source);
+  CHECK_EQ(0xaaaaaa, script->Run()->Int32Value());
 }
 
 
 
 // Binary op tests start with well-behaved Smi values, then step thru
-// corner cases, such as overflow from Smi value, to one Smi, one 
+// corner cases, such as overflow from Smi value, to one Smi, one
 // non-Smi, then to float cases.
 
 
@@ -329,19 +514,19 @@ TEST(MIPSBinaryDiv) {
   const char* js;
   Local<String> source;
   Local<Script> script;
-  
+
   // Check basic Smi divide.
   js = "function f() { var a=10; var b=5; return a / b; }; f();";
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
   CHECK_EQ(2, script->Run()->Int32Value());
-  
+
   js = "function f() { var a=499998015; var b=4455; return a / b; }; f();";
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
   CHECK_EQ(112233, script->Run()->Int32Value());
 
-  // Check negative 0 result causes conversion to HeapNumber.  
+  // Check negative 0 result causes conversion to HeapNumber.
   js = "function f() { var a=0; var b=-74; return a / b; }; f();";
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
@@ -383,7 +568,7 @@ TEST(MIPSBinaryMod) {
   script = ::v8::Script::Compile(source);
   CHECK_EQ(-4, script->Run()->Int32Value());
 
-  // Check negative 0 result causes conversion to HeapNumber.  
+  // Check negative 0 result causes conversion to HeapNumber.
   js = "function f() { var a=-44; var b=11; return a % b; }; f();";
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
