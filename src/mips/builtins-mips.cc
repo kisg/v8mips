@@ -565,6 +565,30 @@ static void LeaveArgumentsAdaptorFrame(MacroAssembler* masm) {
 }
 
 
+static void EnterArgumentsAdaptorFrame(MacroAssembler* masm) {
+  __ sll(a0, a0, kSmiTagSize);
+  __ li(t0, Operand(Smi::FromInt(StackFrame::ARGUMENTS_ADAPTOR)));
+  __ MultiPush(a0.bit() | a1.bit() | t0.bit() | fp.bit() | ra.bit());
+  __ Add(fp, sp, Operand(3 * kPointerSize));
+}
+
+
+static void LeaveArgumentsAdaptorFrame(MacroAssembler* masm) {
+  // v0 : result being passed through
+  // Get the number of arguments passed (as a smi), tear down the frame and
+  // then tear down the parameters.
+  __ lw(a1, MemOperand(fp, -3 * kPointerSize));
+  __ mov(sp, fp);
+  __ MultiPop(fp.bit() | ra.bit());
+  __ sll(t0, a1, kPointerSizeLog2 - kSmiTagSize);
+  __ Addu(sp, sp, t0);
+  // Adjust for the receiver and arguments slots.
+  __ Addu(sp, sp,
+    // Use the branch delay slot.
+      Operand(kPointerSize + StandardFrameConstants::kRArgsSlotsSize));
+}
+
+
 void Builtins::Generate_ArgumentsAdaptorTrampoline(MacroAssembler* masm) {
   // State setup as expected by MacroAssembler::InvokePrologue.
   // a0: actual arguments count
