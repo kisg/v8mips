@@ -5105,10 +5105,13 @@ void CallFunctionStub::Generate(MacroAssembler* masm) {
   // Fast-case: Invoke the function now.
   // a1: pushed function
   ParameterCount actual(argc_);
+//  __ break_(__LINE__);
   __ InvokeFunction(a1, actual, JUMP_FUNCTION);
+//  __ break_(__LINE__);
 
   // Slow-case: Non-function called.
   __ bind(&slow);
+  __ break_(__LINE__);
   // CALL_NON_FUNCTION expects the non-function callee as receiver (instead
   // of the original receiver from the call site).
   __ sw(a1, MemOperand(sp, argc_ * kPointerSize));
