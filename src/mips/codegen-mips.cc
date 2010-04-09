@@ -171,6 +171,7 @@ void CodeGenerator::Generate(CompilationInfo* info) {
     VirtualFrame::SpilledScope spilled_scope;
     if (scope()->num_heap_slots() > 0) {
       UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
     }
 
     {
@@ -206,6 +207,7 @@ void CodeGenerator::Generate(CompilationInfo* info) {
     // context.
     if (scope()->arguments() != NULL) {
       UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
     }
 
     // Generate code to 'execute' declarations and initialize functions
@@ -224,6 +226,7 @@ void CodeGenerator::Generate(CompilationInfo* info) {
 
     if (FLAG_trace) {
       UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
     }
 
     // Compile the body of the function in a vanilla state. Don't
@@ -237,6 +240,7 @@ void CodeGenerator::Generate(CompilationInfo* info) {
           is_builtin ? FLAG_trace_builtin_calls : FLAG_trace_calls;
       if (should_trace) {
         UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
       }
 #endif
       VisitStatementsAndSpill(info->function()->body());
@@ -258,6 +262,7 @@ void CodeGenerator::Generate(CompilationInfo* info) {
     function_return_.Bind();
     if (FLAG_trace) {
       UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
     }
 
     // We don't check for the return code size. It may differ if the number of
@@ -316,6 +321,7 @@ void CodeGenerator::LoadReference(Reference* ref) {
     }
   } else {
     UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
   }
 }
 
@@ -453,6 +459,7 @@ void CodeGenerator::Load(Expression* x) {
 
   if (true_target.is_linked() || false_target.is_linked()) {
     UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
   }
   ASSERT(has_valid_frame());
   ASSERT(!has_cc());
@@ -650,6 +657,7 @@ void CodeGenerator::StoreToSlot(Slot* slot, InitState init_state) {
     JumpTarget exit;
     if (init_state == CONST_INIT) {
       UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
     }
 
     // We must execute the store. Storing a variable must keep the
@@ -666,6 +674,7 @@ void CodeGenerator::StoreToSlot(Slot* slot, InitState init_state) {
     frame_->EmitPush(a0);
     if (slot->type() == Slot::CONTEXT) {
       UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
     }
     // If we definitely did not jump over the assignment, we do not need
     // to bind the exit label. Doing so can defeat peephole
@@ -1084,7 +1093,7 @@ void CodeGenerator::Comparison(Condition cc,
   // We call with 0 args because there are 0 on the stack.
   UNIMPLEMENTED_MIPS();
   // This is not implemented on MIPS yet. Break.
-  __ break_(0x504);
+  __ break_(__LINE__);
   exit.Jump();
 
   // Do smi comparison.
@@ -1195,6 +1204,7 @@ void CodeGenerator::VisitDeclaration(Declaration* node) {
   // exists in the local context.
   if (slot != NULL && slot->type() == Slot::LOOKUP) {
     UNIMPLEMENTED_MIPS();
+    __ break_(__LINE__);
     return;
   }
 
@@ -1204,6 +1214,7 @@ void CodeGenerator::VisitDeclaration(Declaration* node) {
   Expression* val = NULL;
   if (node->mode() == Variable::CONST) {
     UNIMPLEMENTED_MIPS();
+    __ break_(__LINE__);
   } else {
     val = node->fun();  // NULL if we don't have a function.
   }
@@ -1241,6 +1252,7 @@ void CodeGenerator::VisitExpressionStatement(ExpressionStatement* node) {
 
 void CodeGenerator::VisitEmptyStatement(EmptyStatement* node) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
@@ -1742,7 +1754,7 @@ void CodeGenerator::VisitTryFinallyStatement(TryFinallyStatement* node) {
   int handler_height = frame_->height();
 
   // Shadow the labels for all escapes from the try block, including
-  // returns.  Shadowing hides the original label as the LabelShadow and
+  // returns. Shadowing hides the original label as the LabelShadow and
   // operations on the original actually affect the shadowing label.
 
   // We should probably try to unify the escaping labels and the return
@@ -1943,11 +1955,13 @@ void CodeGenerator::VisitFunctionLiteral(FunctionLiteral* node) {
 void CodeGenerator::VisitSharedFunctionInfoLiteral(
     SharedFunctionInfoLiteral* node) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::VisitConditional(Conditional* node) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
@@ -1996,11 +2010,13 @@ void CodeGenerator::VisitLiteral(Literal* node) {
 
 void CodeGenerator::VisitRegExpLiteral(RegExpLiteral* node) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::VisitObjectLiteral(ObjectLiteral* node) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
@@ -2021,8 +2037,10 @@ void CodeGenerator::VisitArrayLiteral(ArrayLiteral* node) {
   int length = node->values()->length();
   if (node->depth() > 1) {
     UNIMPLEMENTED_MIPS();
+    __ break_(__LINE__);
   } else if (length > FastCloneShallowArrayStub::kMaximumLength) {
     UNIMPLEMENTED_MIPS();
+    __ break_(__LINE__);
   } else {
     FastCloneShallowArrayStub stub(length);
     frame_->CallStub(&stub, 3);
@@ -2146,6 +2164,7 @@ void CodeGenerator::VisitAssignment(Assignment* node) {
 
 void CodeGenerator::VisitThrow(Throw* node) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
@@ -2271,10 +2290,12 @@ void CodeGenerator::VisitCall(Call* node) {
 
     } else {
       UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
     }
 
   } else {
     UNIMPLEMENTED_MIPS();
+    __ break_(__LINE__);
   }
 
   ASSERT(frame_->height() == original_height + 1);
@@ -2331,51 +2352,61 @@ void CodeGenerator::VisitCallNew(CallNew* node) {
 
 void CodeGenerator::GenerateClassOf(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateValueOf(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateSetValueOf(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateIsSmi(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateLog(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateIsNonNegativeSmi(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateMathPow(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateMathCos(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateMathSin(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateMathSqrt(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
@@ -2384,86 +2415,103 @@ void CodeGenerator::GenerateMathSqrt(ZoneList<Expression*>* args) {
 // It is not yet implemented on ARM, so it always goes to the slow case.
 void CodeGenerator::GenerateFastCharCodeAt(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateCharFromCode(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateIsArray(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateIsRegExp(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateIsConstructCall(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateArgumentsLength(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateArguments(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateRandomPositiveSmi(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateObjectEquals(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateIsObject(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateIsFunction(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateIsUndetectableObject(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateStringAdd(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateSubString(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateStringCompare(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateRegExpExec(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
 void CodeGenerator::GenerateNumberToString(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
@@ -2486,6 +2534,7 @@ void CodeGenerator::VisitCallRuntime(CallRuntime* node) {
 
   if (function == NULL) {
     UNIMPLEMENTED_MIPS();
+    __ break_(__LINE__);
   }
 
   // Push the arguments ("left-to-right").
@@ -2495,6 +2544,7 @@ void CodeGenerator::VisitCallRuntime(CallRuntime* node) {
 
   if (function == NULL) {
     UNIMPLEMENTED_MIPS();
+    __ break_(__LINE__);
   } else {
     // Call the C runtime function.
     frame_->CallRuntime(function, arg_count);
@@ -2525,6 +2575,7 @@ void CodeGenerator::VisitUnaryOperation(UnaryOperation* node) {
 
   } else if (op == Token::DELETE) {
     UNIMPLEMENTED_MIPS();
+    __ break_(__LINE__);
 
   } else if (op == Token::TYPEOF) {
     // Special case for loading the typeof expression; see comment on
@@ -2548,6 +2599,7 @@ void CodeGenerator::VisitUnaryOperation(UnaryOperation* node) {
 
       case Token::SUB: {
         UNIMPLEMENTED_MIPS();
+        __ break_(__LINE__);
         break;
       }
 
@@ -2570,10 +2622,12 @@ void CodeGenerator::VisitUnaryOperation(UnaryOperation* node) {
 
       case Token::VOID:
         UNIMPLEMENTED_MIPS();
+        __ break_(__LINE__);
         break;
 
       case Token::ADD: {
         UNIMPLEMENTED_MIPS();
+        __ break_(__LINE__);
         break;
       }
       default:
@@ -2822,6 +2876,7 @@ void CodeGenerator::VisitBinaryOperation(BinaryOperation* node) {
 
 void CodeGenerator::VisitThisFunction(ThisFunction* node) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
@@ -2938,9 +2993,11 @@ void CodeGenerator::VisitCompareOperation(CompareOperation* node) {
 
     } else if (check->Equals(Heap::function_symbol())) {
       UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
 
     } else if (check->Equals(Heap::object_symbol())) {
       UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
 
     } else {
       // Uncommon case: typeof testing against a string literal that is
@@ -2979,6 +3036,7 @@ void CodeGenerator::VisitCompareOperation(CompareOperation* node) {
 
     case Token::IN: {
       UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
       break;
     }
 
@@ -3059,6 +3117,7 @@ void Reference::GetValue() {
   switch (type_) {
     case SLOT: {
       UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
       break;
     }
 
@@ -3452,9 +3511,11 @@ void GenericUnaryOpStub::Generate(MacroAssembler* masm) {
 
   if (op_ == Token::SUB) {
     UNIMPLEMENTED_MIPS();
+    __ break_(__LINE__);
 
   } else if (op_ == Token::BIT_NOT) {
     UNIMPLEMENTED_MIPS();
+    __ break_(__LINE__);
 
   } else {
     UNIMPLEMENTED();
@@ -3522,7 +3583,7 @@ void CEntryStub::GenerateThrowTOS(MacroAssembler* masm) {
 void CEntryStub::GenerateThrowUncatchable(MacroAssembler* masm,
                                           UncatchableExceptionType type) {
   UNIMPLEMENTED_MIPS();
-  __ break_(0x815);
+  __ break_(__LINE__);
 }
 
 void CEntryStub::GenerateCore(MacroAssembler* masm,
@@ -3538,12 +3599,14 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
 
   if (do_gc) {
     UNIMPLEMENTED_MIPS();
+    __ break_(__LINE__);
   }
 
   ExternalReference scope_depth =
       ExternalReference::heap_always_allocate_scope_depth();
   if (always_allocate) {
     UNIMPLEMENTED_MIPS();
+    __ break_(__LINE__);
   }
 
   // Call C built-in.
@@ -3559,6 +3622,7 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
 
   if (always_allocate) {
     UNIMPLEMENTED_MIPS();
+    __ break_(__LINE__);
   }
 
   // Check for failure result.
@@ -3860,19 +3924,19 @@ void InstanceofStub::Generate(MacroAssembler* masm) {
 
 void ArgumentsAccessStub::GenerateReadLength(MacroAssembler* masm) {
   UNIMPLEMENTED_MIPS();
-  __ break_(0x851);
+  __ break_(__LINE__);
 }
 
 
 void ArgumentsAccessStub::GenerateReadElement(MacroAssembler* masm) {
   UNIMPLEMENTED_MIPS();
-  __ break_(0x857);
+  __ break_(__LINE__);
 }
 
 
 void ArgumentsAccessStub::GenerateNewObject(MacroAssembler* masm) {
   UNIMPLEMENTED_MIPS();
-  __ break_(0x863);
+  __ break_(__LINE__);
 }
 
 
@@ -4748,6 +4812,7 @@ void StringStubBase::GenerateTwoCharacterSymbolTableProbe(MacroAssembler* masm,
                                                           Register scratch5,
                                                           Label* not_found) {
   UNIMPLEMENTED_MIPS();
+  __ break_(__LINE__);
 }
 
 
