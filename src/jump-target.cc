@@ -260,8 +260,8 @@ void JumpTarget::Branch(Condition cc, Hint hint) {
   DoBranch(cc, hint);
 }
 #else
-// By default, condReg1 and condReg2 registers are used for condition evaluation.
-void JumpTarget::Branch(Condition cc, Register src1, const Operand& src2, Hint hint) {
+void JumpTarget::Branch(Condition cc,
+    Register src1, const Operand& src2, Hint hint) {
   DoBranch(cc, hint, src1, src2);
 }
 #endif
@@ -433,8 +433,8 @@ void BreakTarget::Branch(Condition cc, Hint hint) {
   }
 }
 #else
-void BreakTarget::Branch(Condition cc, Register src1, const Operand& src2
-    , Hint hint) {
+void BreakTarget::Branch(Condition cc, Register src1, const Operand& src2,
+    Hint hint) {
   ASSERT(cgen()->has_valid_frame());
 
   int count = cgen()->frame()->height() - expected_height_;

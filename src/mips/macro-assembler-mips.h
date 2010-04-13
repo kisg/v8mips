@@ -37,11 +37,18 @@ namespace internal {
 // Forward declaration.
 class JumpTarget;
 
-// Register at is used for instruction generation. So it is not safe to use it
-// unless we know exactly what we do.
+// Register at is used for instruction generation. So it is not always safe to
+// use it. Instead t8 and t9 registers are used by the MacroAssembler when
+// necessary.
+// The programmer should know that the MacroAssembler may clobber these two,
+// but won't touch other registers except in special cases.
+
+// Unless we know exactly what we do. Therefore we create another scratch reg.
+const Register ip = t8;  // Alias ip (equivalent to arm ip scratch register).
 
 // Registers aliases
 // cp is assumed to be a callee saved register.
+const Register roots = s6;  // Roots array pointer.
 const Register cp = s7;     // JavaScript context pointer
 const Register fp = s8_fp;  // Alias fp
 // Register used for condition evaluation.
@@ -109,6 +116,96 @@ class MacroAssembler: public Assembler {
                      const Operand& rt = Operand(zero_reg),
                      Register scratch = at, bool ProtectBranchDelaySlot = true);
 
+  // Convenient template with the boolean as first argument.
+  inline void Jump(bool ProtectBranchDelaySlot,
+                   const Operand& target,
+                   Condition cond = cc_always,
+                   Register r1 = zero_reg,
+                   const Operand& r2 = Operand(zero_reg)) {
+  Jump(target, cond, r1, r2, ProtectBranchDelaySlot);
+}
+  inline void Call(bool ProtectBranchDelaySlot,
+                   const Operand& target,
+                   Condition cond = cc_always,
+                   Register r1 = zero_reg,
+                   const Operand& r2 = Operand(zero_reg)) {
+  Call(target, cond, r1, r2, ProtectBranchDelaySlot);
+}
+  inline void Jump(bool ProtectBranchDelaySlot,
+                   Register target,
+                   Condition cond = cc_always,
+                   Register r1 = zero_reg,
+                   const Operand& r2 = Operand(zero_reg)) {
+  Jump(target, cond, r1, r2, ProtectBranchDelaySlot);
+}
+  inline void Jump(bool ProtectBranchDelaySlot,
+                   byte* target, RelocInfo::Mode rmode,
+                   Condition cond = cc_always,
+                   Register r1 = zero_reg,
+                   const Operand& r2 = Operand(zero_reg)) {
+  Jump(target, rmode, cond, r1, r2, ProtectBranchDelaySlot);
+}
+  inline void Jump(bool ProtectBranchDelaySlot,
+                   Handle<Code> code, RelocInfo::Mode rmode,
+                   Condition cond = cc_always,
+                   Register r1 = zero_reg,
+                   const Operand& r2 = Operand(zero_reg)) {
+  Jump(code, rmode, cond, r1, r2, ProtectBranchDelaySlot);
+}
+  inline void Call(bool ProtectBranchDelaySlot,
+                   Register target,
+                   Condition cond = cc_always,
+                   Register r1 = zero_reg,
+                   const Operand& r2 = Operand(zero_reg)) {
+  Call(target, cond, r1, r2, ProtectBranchDelaySlot);
+}
+  inline void Call(bool ProtectBranchDelaySlot,
+                   byte* target, RelocInfo::Mode rmode,
+                   Condition cond = cc_always,
+                   Register r1 = zero_reg,
+                   const Operand& r2 = Operand(zero_reg)) {
+  Call(target, rmode, cond, r1, r2, ProtectBranchDelaySlot);
+}
+  inline void Call(bool ProtectBranchDelaySlot,
+                   Handle<Code> code, RelocInfo::Mode rmode,
+                   Condition cond = cc_always,
+                   Register r1 = zero_reg,
+                   const Operand& r2 = Operand(zero_reg)) {
+  Call(code, rmode, cond, r1, r2, ProtectBranchDelaySlot);
+}
+  inline void Ret(bool ProtectBranchDelaySlot,
+                  Condition cond = cc_always,
+                  Register r1 = zero_reg,
+                  const Operand& r2 = Operand(zero_reg)) {
+  Ret(cond, r1, r2, ProtectBranchDelaySlot);
+}
+  inline void Branch(bool ProtectBranchDelaySlot,
+                     Condition cond, int16_t offset, Register rs = zero_reg,
+                     const Operand& rt = Operand(zero_reg),
+                     Register scratch = at) {
+  Branch(cond, offset, rs, rt, scratch = at, ProtectBranchDelaySlot);
+}
+  inline void Branch(bool ProtectBranchDelaySlot,
+                     Condition cond, Label* L, Register rs = zero_reg,
+                     const Operand& rt = Operand(zero_reg),
+                     Register scratch = at) {
+  Branch(cond, L, rs, rt, scratch = at, ProtectBranchDelaySlot);
+}
+  // conditionnal branch and link
+  inline void BranchAndLink(bool ProtectBranchDelaySlot,
+                            Condition cond, int16_t offset,
+                            Register rs = zero_reg,
+                            const Operand& rt = Operand(zero_reg),
+                            Register scratch = at) {
+  BranchAndLink(cond, offset, rs, rt, at, ProtectBranchDelaySlot);
+}
+  inline void BranchAndLink(bool ProtectBranchDelaySlot,
+                            Condition cond, Label* L, Register rs = zero_reg,
+                            const Operand& rt = Operand(zero_reg),
+                            Register scratch = at) {
+  BranchAndLink(cond, L, rs, rt, at, ProtectBranchDelaySlot);
+}
+
   // Emit code to discard a non-negative number of pointer-sized elements
   // from the stack, clobbering only the sp register.
   void Drop(int count, Condition cond = cc_always);
@@ -141,9 +238,89 @@ class MacroAssembler: public Assembler {
 
 
   // ---------------------------------------------------------------------------
+  // Inline caching support
+
+  // Generates code that verifies that the maps of objects in the
+  // prototype chain of object hasn't changed since the code was
+  // generated and branches to the miss label if any map has. If
+  // necessary the function also generates code for security check
+  // in case of global object holders. The scratch and holder
+  // registers are always clobbered, but the object register is only
+  // clobbered if it the same as the holder register. The function
+  // returns a register containing the holder - either object_reg or
+  // holder_reg.
+  Register CheckMaps(JSObject* object, Register object_reg,
+                     JSObject* holder, Register holder_reg,
+                     Register scratch, Label* miss);
+
+  // Generate code for checking access rights - used for security checks
+  // on access to global objects across environments. The holder register
+  // is left untouched, whereas both scratch registers are clobbered.
+  void CheckAccessGlobalProxy(Register holder_reg,
+                              Register scratch,
+                              Label* miss);
+
+
+  // ---------------------------------------------------------------------------
+  // Allocation support
+
+  // Allocate an object in new space. The object_size is specified in words (not
+  // bytes). If the new space is exhausted control continues at the gc_required
+  // label. The allocated object is returned in result. If the flag
+  // tag_allocated_object is true the result is tagged as as a heap object.
+  void AllocateInNewSpace(int object_size,
+                                Register result,
+                                Register scratch1,
+                                Register scratch2,
+                                Label* gc_required,
+                                AllocationFlags flags);
+  void AllocateInNewSpace(Register object_size,
+                                Register result,
+                                Register scratch1,
+                                Register scratch2,
+                                Label* gc_required,
+                                AllocationFlags flags);
+
+  // Undo allocation in new space. The object passed and objects allocated after
+  // it will no longer be allocated. The caller must make sure that no pointers
+  // are left to the object(s) no longer allocated as they would be invalid when
+  // allocation is undone.
+  void UndoAllocationInNewSpace(Register object, Register scratch);
+
+  void AllocateTwoByteString(Register result,
+                             Register length,
+                             Register scratch1,
+                             Register scratch2,
+                             Register scratch3,
+                             Label* gc_required);
+  void AllocateAsciiString(Register result,
+                           Register length,
+                           Register scratch1,
+                           Register scratch2,
+                           Register scratch3,
+                           Label* gc_required);
+  void AllocateTwoByteConsString(Register result,
+                                 Register length,
+                                 Register scratch1,
+                                 Register scratch2,
+                                 Label* gc_required);
+  void AllocateAsciiConsString(Register result,
+                               Register length,
+                               Register scratch1,
+                               Register scratch2,
+                               Label* gc_required);
+
+  // Allocates a heap number or jumps to the need_gc label if the young space
+  // is full and a scavenge is needed.
+  void AllocateHeapNumber(Register result,
+                          Register scratch1,
+                          Register scratch2,
+                          Label* gc_required);
+
+  // ---------------------------------------------------------------------------
   // Instruction macros
 
-#define DEFINE_INSTRUCTION(instr)                                       \
+#define DEFINE_INSTRUCTION(instr)                                              \
   void instr(Register rd, Register rs, const Operand& rt);                     \
   void instr(Register rd, Register rs, Register rt) {                          \
     instr(rd, rs, Operand(rt));                                                \
@@ -152,7 +329,7 @@ class MacroAssembler: public Assembler {
     instr(rs, rt, Operand(j));                                                 \
   }
 
-#define DEFINE_INSTRUCTION2(instr)                                      \
+#define DEFINE_INSTRUCTION2(instr)                                             \
   void instr(Register rs, const Operand& rt);                                  \
   void instr(Register rs, Register rt) {                                       \
     instr(rs, Operand(rt));                                                    \
@@ -163,6 +340,7 @@ class MacroAssembler: public Assembler {
 
   DEFINE_INSTRUCTION(Add);
   DEFINE_INSTRUCTION(Addu);
+  DEFINE_INSTRUCTION(Subu);
   DEFINE_INSTRUCTION(Mul);
   DEFINE_INSTRUCTION2(Mult);
   DEFINE_INSTRUCTION2(Multu);
@@ -184,8 +362,6 @@ class MacroAssembler: public Assembler {
   //------------Pseudo-instructions-------------
 
   void mov(Register rd, Register rt) { or_(rd, rt, zero_reg); }
-  // Move the logical ones complement of source to dest.
-  void movn(Register rd, Register rt);
 
 
   // load int32 in the rd register
@@ -224,8 +400,8 @@ class MacroAssembler: public Assembler {
     lw(dst, MemOperand(sp, 0));
     Addu(sp, sp, Operand(kPointerSize));
   }
-  void Pop() {
-    Add(sp, sp, Operand(kPointerSize));
+  void Pop(uint32_t count = 1) {
+    Add(sp, sp, Operand(count * kPointerSize));
   }
 
 
@@ -234,6 +410,9 @@ class MacroAssembler: public Assembler {
 
   void EnterInternalFrame() { EnterFrame(StackFrame::INTERNAL); }
   void LeaveInternalFrame() { LeaveFrame(StackFrame::INTERNAL); }
+
+  void EnterConstructFrame() { EnterFrame(StackFrame::CONSTRUCT); }
+  void LeaveConstructFrame() { LeaveFrame(StackFrame::CONSTRUCT); }
 
   // Enter specific kind of exit frame; either EXIT or
   // EXIT_DEBUG. Expects the number of arguments in register a0 and
@@ -275,6 +454,10 @@ class MacroAssembler: public Assembler {
                       const ParameterCount& actual,
                       InvokeFlag flag);
 
+  void InvokeFunction(JSFunction* function,
+                      const ParameterCount& actual,
+                      InvokeFlag flag);
+
 
 #ifdef ENABLE_DEBUGGER_SUPPORT
   // ---------------------------------------------------------------------------
@@ -295,6 +478,7 @@ class MacroAssembler: public Assembler {
 
   // Push a new try handler and link into try handler chain.
   // The return address must be passed in register ra.
+  // Clobber t0, t1, t2.
   void PushTryHandler(CodeLocation try_location, HandlerType type);
 
   // Unlink the stack handler on top of the stack from the try handler chain.
@@ -304,6 +488,16 @@ class MacroAssembler: public Assembler {
 
   // ---------------------------------------------------------------------------
   // Support functions.
+
+  // Try to get function prototype of a function and puts the value in
+  // the result register. Checks that the function really is a
+  // function and jumps to the miss label if the fast checks fail. The
+  // function register will be untouched; the other registers may be
+  // clobbered.
+  void TryGetFunctionPrototype(Register function,
+                               Register result,
+                               Register scratch,
+                               Label* miss);
 
   void GetObjectType(Register function,
                      Register map,
@@ -326,8 +520,10 @@ class MacroAssembler: public Assembler {
 
   void CallBuiltin(ExternalReference builtin_entry);
   void CallBuiltin(Register target);
+  void CallBuiltin(Handle<Code> code, RelocInfo::Mode rmode);
   void JumpToBuiltin(ExternalReference builtin_entry);
   void JumpToBuiltin(Register target);
+  void JumpToBuiltin(Handle<Code> code, RelocInfo::Mode rmode);
 
   // Generates code for reporting that an illegal operation has
   // occurred.
@@ -340,6 +536,10 @@ class MacroAssembler: public Assembler {
   // Call a code stub.
   void CallStub(CodeStub* stub, Condition cond = cc_always,
                 Register r1 = zero_reg, const Operand& r2 = Operand(zero_reg));
+
+  // Tail call a code stub (jump).
+  void TailCallStub(CodeStub* stub);
+
   void CallJSExitStub(CodeStub* stub);
 
   // Return from a code stub after popping its arguments.
@@ -371,7 +571,7 @@ class MacroAssembler: public Assembler {
   void InvokeBuiltin(Builtins::JavaScript id, InvokeJSFlags flags);
 
   // Store the code object for the given builtin in the target register and
-  // setup the function in r1.
+  // setup the function in a1.
   void GetBuiltinEntry(Register target, Builtins::JavaScript id);
 
   struct Unresolved {
@@ -420,6 +620,32 @@ class MacroAssembler: public Assembler {
   void set_allow_stub_calls(bool value) { allow_stub_calls_ = value; }
   bool allow_stub_calls() { return allow_stub_calls_; }
 
+  // ---------------------------------------------------------------------------
+  // Smi utilities
+
+  // Jump if either of the registers contain a non-smi.
+  void JumpIfNotBothSmi(Register reg1, Register reg2, Label* on_not_both_smi);
+  // Jump if either of the registers contain a smi.
+  void JumpIfEitherSmi(Register reg1, Register reg2, Label* on_either_smi);
+
+  // ---------------------------------------------------------------------------
+  // String utilities
+
+  // Checks if both instance types are sequential ASCII strings and jumps to
+  // label if either is not.
+  void JumpIfBothInstanceTypesAreNotSequentialAscii(
+      Register first_object_instance_type,
+      Register second_object_instance_type,
+      Register scratch1,
+      Register scratch2,
+      Label* failure);
+
+  // Check if instance type is sequential ASCII string and jump to label if
+  // it is not.
+  void JumpIfInstanceTypeIsNotSequentialAscii(Register type,
+                                              Register scratch,
+                                              Label* failure);
+
  private:
   List<Unresolved> unresolved_;
   bool generating_stub_;
@@ -447,7 +673,6 @@ class MacroAssembler: public Assembler {
   Handle<Code> ResolveBuiltin(Builtins::JavaScript id, bool* resolved);
 
   // Activation support.
-  // EnterFrame clobbers t0 and t1.
   void EnterFrame(StackFrame::Type type);
   void LeaveFrame(StackFrame::Type type);
 };

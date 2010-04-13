@@ -63,7 +63,8 @@ void VirtualFrame::SyncRange(int begin, int end) {
 
 
 void VirtualFrame::MergeTo(VirtualFrame* expected) {
-  UNIMPLEMENTED_MIPS();
+  // MIPS frames are currently always in memory.
+  ASSERT(Equals(expected));
 }
 
 
@@ -129,12 +130,16 @@ void VirtualFrame::StoreToFrameSlotAt(int index) {
 
 
 void VirtualFrame::PushTryHandler(HandlerType type) {
-  UNIMPLEMENTED_MIPS();
+  // Grow the expression stack by handler size less one (the return
+  // address in lr is already counted by a call instruction).
+  Adjust(kHandlerSize - 1);
+  __ PushTryHandler(IN_JAVASCRIPT, type);
 }
 
 
 void VirtualFrame::RawCallStub(CodeStub* stub) {
-  UNIMPLEMENTED_MIPS();
+  ASSERT(cgen()->HasValidEntryRegisters());
+  __ CallStub(stub);
 }
 
 
@@ -149,14 +154,14 @@ void VirtualFrame::CallStub(CodeStub* stub, Result* arg0, Result* arg1) {
 
 
 void VirtualFrame::CallRuntime(Runtime::Function* f, int arg_count) {
-  PrepareForCall(arg_count, arg_count);
+  Forget(arg_count);
   ASSERT(cgen()->HasValidEntryRegisters());
   __ CallRuntime(f, arg_count);
 }
 
 
 void VirtualFrame::CallRuntime(Runtime::FunctionId id, int arg_count) {
-  PrepareForCall(arg_count, arg_count);
+  Forget(arg_count);
   ASSERT(cgen()->HasValidEntryRegisters());
   __ CallRuntime(id, arg_count);
 }
@@ -174,9 +179,9 @@ void VirtualFrame::CallAlignedRuntime(Runtime::FunctionId id, int arg_count) {
 
 void VirtualFrame::InvokeBuiltin(Builtins::JavaScript id,
                                  InvokeJSFlags flags,
-                                 Result* arg_count_register,
                                  int arg_count) {
-  UNIMPLEMENTED_MIPS();
+  Forget(arg_count);
+  __ InvokeBuiltin(id, flags);
 }
 
 
@@ -185,50 +190,41 @@ void VirtualFrame::CallCodeObject(Handle<Code> code,
                                   int dropped_args) {
   switch (code->kind()) {
     case Code::CALL_IC:
+      Forget(dropped_args);
+      ASSERT(cgen()->HasValidEntryRegisters());
+      __ Call(code, rmode);
       break;
+
     case Code::FUNCTION:
       UNIMPLEMENTED_MIPS();
       break;
+
     case Code::KEYED_LOAD_IC:
-      UNIMPLEMENTED_MIPS();
-      break;
     case Code::LOAD_IC:
-      UNIMPLEMENTED_MIPS();
-      break;
     case Code::KEYED_STORE_IC:
-      UNIMPLEMENTED_MIPS();
-      break;
     case Code::STORE_IC:
-      UNIMPLEMENTED_MIPS();
+      ASSERT(dropped_args == 0);
+      Forget(dropped_args);
+      ASSERT(cgen()->HasValidEntryRegisters());
+      __ Call(code, rmode);
       break;
+
     case Code::BUILTIN:
-      UNIMPLEMENTED_MIPS();
+      // The only builtin called through this function is JSConstructCall.
+      ASSERT(*code == Builtins::builtin(Builtins::JSConstructCall));
+      Forget(dropped_args);
+      ASSERT(cgen()->HasValidEntryRegisters());
+      // This is a builtin and it expects argument slots.
+      // Don't protect the branch delay slot and use it to allocate args slots.
+      __ Call(false, code, rmode);
+      __ addiu(sp, sp, -StandardFrameConstants::kBArgsSlotsSize);
+      __ addiu(sp, sp, StandardFrameConstants::kBArgsSlotsSize);
       break;
+
     default:
       UNREACHABLE();
       break;
   }
-  Forget(dropped_args);
-  ASSERT(cgen()->HasValidEntryRegisters());
-  __ Call(code, rmode);
-}
-
-
-void VirtualFrame::CallCodeObject(Handle<Code> code,
-                                  RelocInfo::Mode rmode,
-                                  Result* arg,
-                                  int dropped_args) {
-  UNIMPLEMENTED_MIPS();
-}
-
-
-void VirtualFrame::CallCodeObject(Handle<Code> code,
-                                  RelocInfo::Mode rmode,
-                                  Result* arg0,
-                                  Result* arg1,
-                                  int dropped_args,
-                                  bool set_auto_args_slots) {
-  UNIMPLEMENTED_MIPS();
 }
 
 
@@ -303,6 +299,18 @@ void VirtualFrame::EmitMultiPush(RegList regs) {
     }
   }
   __ MultiPush(regs);
+}
+
+
+void VirtualFrame::EmitMultiPushReversed(RegList regs) {
+  ASSERT(stack_pointer_ == element_count() - 1);
+  for (int16_t i = 0; i< RegisterAllocatorConstants::kNumRegisters; i++) {
+    if ((regs & (1<<i)) != 0) {
+      elements_.Add(FrameElement::MemoryElement(NumberInfo::Unknown()));
+      stack_pointer_++;
+    }
+  }
+  __ MultiPushReversed(regs);
 }
 
 

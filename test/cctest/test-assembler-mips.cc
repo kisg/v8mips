@@ -226,6 +226,25 @@ TEST(MIPS2) {
   __ Branch(ne, &error, v1, Operand(0x81230000));
   __ nop();
 
+  // Bit twiddling instructions & conditional moves.
+  // Uses t0-t7 as set above.
+  __ clz(v0, t0);       // 29
+  __ clz(v1, t1);       // 19
+  __ addu(v0, v0, v1);  // 48
+  __ clz(v1, t2);       // 3
+  __ addu(v0, v0, v1);  // 51
+  __ clz(v1, t7);       // 0
+  __ addu(v0, v0, v1);  // 51
+  __ Branch(ne, &error, v0, Operand(51));
+  __ movn(a0, t3, t0);  // move a0<-t3 (t0 is NOT 0)
+  __ ins(a0, t1, 12, 8);  // 0x7ff34fff
+  __ Branch(ne, &error, a0, Operand(0x7ff34fff));
+  __ movz(a0, t6, t7);    // a0 not updated (t7 is NOT 0)
+  __ ext(a1, a0, 8, 12);  // 0x34f
+  __ Branch(ne, &error, a1, Operand(0x34f));
+  __ movz(a0, t6, v1);    // a0<-t6, v0 is 0, from 8 instr back
+  __ Branch(ne, &error, a0, Operand(t6));
+
   // Everything was correctly executed. Load the expected result.
   __ li(v0, 0x31415926);
   __ b(&exit);
@@ -233,6 +252,7 @@ TEST(MIPS2) {
 
   __ bind(&error);
   // Got an error. Return a wrong result.
+  __ li(v0, 666);
 
   __ bind(&exit);
   __ jr(ra);
@@ -453,6 +473,82 @@ TEST(MIPS5) {
   CHECK_EQ(-100000.0, t.b);
   CHECK_EQ(15000, t.i);
   CHECK_EQ(275000000, t.j);
+}
+
+
+TEST(MIPS6) {
+  // Test simple memory loads and stores
+  InitializeVM();
+  v8::HandleScope scope;
+
+  typedef struct {
+    uint32_t ui;
+    int32_t si;
+    int32_t r1;
+    int32_t r2;
+    int32_t r3;
+    int32_t r4;
+    int32_t r5;
+    int32_t r6;
+  } T;
+  T t;
+
+  Assembler assm(NULL, 0);
+  Label L, C;
+
+  // basic word load/store
+  __ lw(t0, MemOperand(a0, OFFSET_OF(T, ui)) );
+  __ sw(t0, MemOperand(a0, OFFSET_OF(T, r1)) );
+
+  // lh with positive data
+  __ lh(t1, MemOperand(a0, OFFSET_OF(T, ui)) );
+  __ sw(t1, MemOperand(a0, OFFSET_OF(T, r2)) );
+
+  // lh with negative data
+  __ lh(t2, MemOperand(a0, OFFSET_OF(T, si)) );
+  __ sw(t2, MemOperand(a0, OFFSET_OF(T, r3)) );
+
+  // lhu with negative data
+  __ lhu(t3, MemOperand(a0, OFFSET_OF(T, si)) );
+  __ sw(t3, MemOperand(a0, OFFSET_OF(T, r4)) );
+
+  // lb with negative data
+  __ lb(t4, MemOperand(a0, OFFSET_OF(T, si)) );
+  __ sw(t4, MemOperand(a0, OFFSET_OF(T, r5)) );
+
+  // sh writes only 1/2 of word
+  __ lui(t5, 0x3333);
+  __ ori(t5, t5, 0x3333);
+  __ sw(t5, MemOperand(a0, OFFSET_OF(T, r6)) );
+  __ lhu(t5, MemOperand(a0, OFFSET_OF(T, si)) );
+  __ sh(t5, MemOperand(a0, OFFSET_OF(T, r6)) );
+
+
+  __ jr(ra);
+  __ nop();
+
+  CodeDesc desc;
+  assm.GetCode(&desc);
+  Object* code = Heap::CreateCode(desc,
+                                  NULL,
+                                  Code::ComputeFlags(Code::STUB),
+                                  Handle<Object>(Heap::undefined_value()));
+  CHECK(code->IsCode());
+#ifdef DEBUG
+  Code::cast(code)->Print();
+#endif
+  F3 f = FUNCTION_CAST<F3>(Code::cast(code)->entry());
+  t.ui = 0x11223344;
+  t.si = 0x99aabbcc;
+  Object* dummy = CALL_GENERATED_CODE(f, &t, 0, 0, 0, 0);
+  USE(dummy);
+
+  CHECK_EQ(0x11223344, t.r1);
+  CHECK_EQ(0x3344, t.r2);
+  CHECK_EQ(0xffffbbcc, t.r3);
+  CHECK_EQ(0x0000bbcc, t.r4);
+  CHECK_EQ(0xffffffcc, t.r5);
+  CHECK_EQ(0x3333bbcc, t.r6);
 }
 
 #undef __

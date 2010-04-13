@@ -139,7 +139,10 @@ struct FPURegister {
     ASSERT(is_valid());
     return 1 << code_;
   }
-
+  void setcode(int f) {
+    code_ = f;
+    ASSERT(is_valid());
+  }
   // Unfortunately we can't make this private in a struct.
   int code_;
 };
@@ -264,6 +267,52 @@ class MemOperand : public Operand {
   int16_t offset_;
 
   friend class Assembler;
+};
+
+
+// CpuFeatures keeps track of which features are supported by the target CPU.
+// Supported features must be enabled by a Scope before use.
+class CpuFeatures : public AllStatic {
+ public:
+  // Detect features of the target CPU. Set safe defaults if the serializer
+  // is enabled (snapshots must be portable).
+  static void Probe();
+
+  // Check whether a feature is supported by the target CPU.
+  static bool IsSupported(CpuFeature f) {
+    if (f == FPU && !FLAG_enable_fpu) return false;
+    return (supported_ & (1u << f)) != 0;
+  }
+
+  // Check whether a feature is currently enabled.
+  static bool IsEnabled(CpuFeature f) {
+    return (enabled_ & (1u << f)) != 0;
+  }
+
+  // Enable a specified feature within a scope.
+  class Scope BASE_EMBEDDED {
+#ifdef DEBUG
+   public:
+    explicit Scope(CpuFeature f) {
+      ASSERT(CpuFeatures::IsSupported(f));
+      ASSERT(!Serializer::enabled() ||
+             (found_by_runtime_probing_ & (1u << f)) == 0);
+      old_enabled_ = CpuFeatures::enabled_;
+      CpuFeatures::enabled_ |= 1u << f;
+    }
+    ~Scope() { CpuFeatures::enabled_ = old_enabled_; }
+   private:
+    unsigned old_enabled_;
+#else
+   public:
+    explicit Scope(CpuFeature f) {}
+#endif
+  };
+
+ private:
+  static unsigned supported_;
+  static unsigned enabled_;
+  static unsigned found_by_runtime_probing_;
 };
 
 
@@ -434,8 +483,11 @@ class Assembler : public Malloced {
 
   void lb(Register rd, const MemOperand& rs);
   void lbu(Register rd, const MemOperand& rs);
+  void lh(Register rd, const MemOperand& rs);
+  void lhu(Register rd, const MemOperand& rs);
   void lw(Register rd, const MemOperand& rs);
   void sb(Register rd, const MemOperand& rs);
+  void sh(Register rd, const MemOperand& rs);
   void sw(Register rd, const MemOperand& rs);
 
 
@@ -460,6 +512,14 @@ class Assembler : public Malloced {
   void slti(Register rd, Register rs, int32_t j);
   void sltiu(Register rd, Register rs, int32_t j);
 
+  // Conditional move.
+  void movz(Register rd, Register rs, Register rt);
+  void movn(Register rd, Register rs, Register rt);
+
+  // Bit twiddling.
+  void clz(Register rd, Register rs);
+  void ins(Register rt, Register rs, uint16_t pos, uint16_t size);
+  void ext(Register rt, Register rs, uint16_t pos, uint16_t size);
 
   //--------Coprocessor-instructions----------------
 
@@ -618,6 +678,13 @@ class Assembler : public Malloced {
                         Register rd,
                         uint16_t sa = 0,
                         SecondaryField func = NULLSF);
+
+  void GenInstrRegister(Opcode opcode,
+                        Register rs,
+                        Register rt,
+                        uint16_t msb,
+                        uint16_t lsb,
+                        SecondaryField func);
 
   void GenInstrRegister(Opcode opcode,
                         SecondaryField fmt,

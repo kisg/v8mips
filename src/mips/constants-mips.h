@@ -196,11 +196,15 @@ enum Opcode {
   BGTZL     =   ((2 << 3) + 7) << kOpcodeShift,
 
   SPECIAL2  =   ((3 << 3) + 4) << kOpcodeShift,
+  SPECIAL3  =   ((3 << 3) + 7) << kOpcodeShift,
 
   LB        =   ((4 << 3) + 0) << kOpcodeShift,
+  LH        =   ((4 << 3) + 1) << kOpcodeShift,
   LW        =   ((4 << 3) + 3) << kOpcodeShift,
   LBU       =   ((4 << 3) + 4) << kOpcodeShift,
+  LHU       =   ((4 << 3) + 5) << kOpcodeShift,
   SB        =   ((5 << 3) + 0) << kOpcodeShift,
+  SH        =   ((5 << 3) + 1) << kOpcodeShift,
   SW        =   ((5 << 3) + 3) << kOpcodeShift,
 
   LWC1      =   ((6 << 3) + 1) << kOpcodeShift,
@@ -221,6 +225,8 @@ enum SecondaryField {
 
   JR        =   ((1 << 3) + 0),
   JALR      =   ((1 << 3) + 1),
+  MOVZ      =   ((1 << 3) + 2),
+  MOVN      =   ((1 << 3) + 3),
   BREAK     =   ((1 << 3) + 5),
 
   MFHI      =   ((2 << 3) + 0),
@@ -252,6 +258,12 @@ enum SecondaryField {
 
   // SPECIAL2 Encoding of Function Field.
   MUL       =   ((0 << 3) + 2),
+  CLZ       =   ((4 << 3) + 0),
+  CLO       =   ((4 << 3) + 1),
+
+  // SPECIAL3 Encoding of Function Field.
+  EXT       =   ((0 << 3) + 0),
+  INS       =   ((0 << 3) + 4),
 
   // REGIMM  encoding of rt Field.
   BLTZ      =   ((0 << 3) + 0) << 16,
@@ -333,6 +345,17 @@ enum Condition {
   ne            = not_equal,
   sign          = negative,
   not_sign      = positive,
+  mi            = negative,
+  pl            = positive,
+  hi            = Ugreater,
+  ls            = Uless_equal,
+  ge            = greater_equal,
+  lt            = less,
+  gt            = greater,
+  le            = less_equal,
+  hs            = Ugreater_equal,
+  lo            = Uless,
+  al            = cc_always,
 
   cc_default    = no_condition
 };
@@ -524,8 +547,15 @@ class Instruction {
 // -----------------------------------------------------------------------------
 // MIPS assembly various constants.
 
+
 static const int kArgsSlotsSize  = 4 * Instruction::kInstructionSize;
 static const int kArgsSlotsNum   = 4;
+// C/C++ argument slots size.
+static const int kCArgsSlotsSize = 4 * Instruction::kInstructionSize;
+// JS argument slots size.
+static const int kJSArgsSlotsSize = 0 * Instruction::kInstructionSize;
+// Assembly builtins argument slots size.
+static const int kBArgsSlotsSize = 0 * Instruction::kInstructionSize;
 
 static const int kBranchReturnOffset = 2 * Instruction::kInstructionSize;
 

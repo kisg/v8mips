@@ -190,9 +190,14 @@ bool Instruction::IsLinkingInstruction() {
   int op = OpcodeFieldRaw();
   switch (op) {
     case JAL:
-    case BGEZAL:
-    case BLTZAL:
-      return true;
+    case REGIMM:
+      switch (RtFieldRaw()) {
+        case BGEZAL:
+        case BLTZAL:
+          return true;
+      default:
+        return false;
+      };
     case SPECIAL:
       switch (FunctionFieldRaw()) {
         case JALR:
@@ -261,6 +266,8 @@ Instruction::Type Instruction::InstructionType() const {
         case TLTU:
         case TEQ:
         case TNE:
+        case MOVZ:
+        case MOVN:
           return kRegisterType;
         default:
           UNREACHABLE();
@@ -269,6 +276,16 @@ Instruction::Type Instruction::InstructionType() const {
     case SPECIAL2:
       switch (FunctionFieldRaw()) {
         case MUL:
+        case CLZ:
+          return kRegisterType;
+        default:
+          UNREACHABLE();
+      };
+      break;
+    case SPECIAL3:
+      switch (FunctionFieldRaw()) {
+        case INS:
+        case EXT:
           return kRegisterType;
         default:
           UNREACHABLE();
@@ -301,9 +318,12 @@ Instruction::Type Instruction::InstructionType() const {
     case BLEZL:
     case BGTZL:
     case LB:
+    case LH:
     case LW:
     case LBU:
+    case LHU:
     case SB:
+    case SH:
     case SW:
     case LWC1:
     case LDC1:

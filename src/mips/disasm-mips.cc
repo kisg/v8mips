@@ -105,6 +105,7 @@ class Decoder {
   void PrintFt(Instruction* instr);
   void PrintFd(Instruction* instr);
   void PrintSa(Instruction* instr);
+  void PrintSd(Instruction* instr);
   void PrintFunction(Instruction* instr);
   void PrintSecondaryField(Instruction* instr);
   void PrintUImm16(Instruction* instr);
@@ -213,6 +214,14 @@ void Decoder::PrintSa(Instruction* instr) {
 }
 
 
+// Print the integer value of the rd field, (when it is not used as reg).
+void Decoder::PrintSd(Instruction* instr) {
+  int sd = instr->RdField();
+  out_buffer_pos_ += v8i::OS::SNPrintF(out_buffer_ + out_buffer_pos_,
+                                       "%d", sd);
+}
+
+
 // Print 16-bit unsigned immediate value.
 void Decoder::PrintUImm16(Instruction* instr) {
   int32_t imm = instr->Imm16Field();
@@ -253,7 +262,8 @@ void Decoder::PrintCode(Instruction* instr) {
     case BREAK: {
       int32_t code = instr->Bits(25, 6);
       out_buffer_pos_ +=
-          v8i::OS::SNPrintF(out_buffer_ + out_buffer_pos_, "0x%05x", code);
+          v8i::OS::SNPrintF(out_buffer_ + out_buffer_pos_, "0x%05x (%d)",
+              code, code);
       break;
                 }
     case TGE:
@@ -361,9 +371,18 @@ int Decoder::FormatOption(Instruction* instr, const char* format) {
       return FormatFPURegister(instr, format);
     }
     case 's': {   // 'sa
-      ASSERT(STRING_STARTS_WITH(format, "sa"));
-      PrintSa(instr);
-      return 2;
+      switch (format[1]) {
+        case 'a': {
+          ASSERT(STRING_STARTS_WITH(format, "sa"));
+          PrintSa(instr);
+          return 2;
+        }
+        case 'd': {
+          ASSERT(STRING_STARTS_WITH(format, "sd"));
+          PrintSd(instr);
+          return 2;
+        }
+      }
     }
   };
   UNREACHABLE();
@@ -575,6 +594,12 @@ void Decoder::DecodeTypeRegister(Instruction* instr) {
         case TNE:
           Format(instr, "tne  'rs, 'rt, code: 'code");
           break;
+        case MOVZ:
+          Format(instr, "movz 'rd, 'rs, 'rt");
+          break;
+        case MOVN:
+          Format(instr, "movn 'rd, 'rs, 'rt");
+          break;
         default:
           UNREACHABLE();
       };
@@ -582,6 +607,22 @@ void Decoder::DecodeTypeRegister(Instruction* instr) {
     case SPECIAL2:
       switch (instr->FunctionFieldRaw()) {
         case MUL:
+          Format(instr, "mul  'rd, 'rs, 'rt");
+          break;
+        case CLZ:
+          Format(instr, "clz  'rd, 'rs");
+          break;
+        default:
+          UNREACHABLE();
+      };
+      break;
+    case SPECIAL3:
+      switch (instr->FunctionFieldRaw()) {
+        case INS:
+          Format(instr, "ins  'rt, 'rs, 'sd, 'sa");
+          break;
+        case EXT:
+          Format(instr, "ext  'rt, 'rs, 'sd, 'sa");
           break;
         default:
           UNREACHABLE();
@@ -656,14 +697,23 @@ void Decoder::DecodeTypeImmediate(Instruction* instr) {
     case LB:
       Format(instr, "lb     'rt, 'imm16s('rs)");
       break;
+    case LH:
+      Format(instr, "lh     'rt, 'imm16s('rs)");
+      break;
     case LW:
       Format(instr, "lw     'rt, 'imm16s('rs)");
       break;
     case LBU:
       Format(instr, "lbu    'rt, 'imm16s('rs)");
       break;
+    case LHU:
+      Format(instr, "lhu    'rt, 'imm16s('rs)");
+      break;
     case SB:
       Format(instr, "sb     'rt, 'imm16s('rs)");
+      break;
+    case SH:
+      Format(instr, "sh     'rt, 'imm16s('rs)");
       break;
     case SW:
       Format(instr, "sw     'rt, 'imm16s('rs)");

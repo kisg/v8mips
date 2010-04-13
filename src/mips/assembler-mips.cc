@@ -42,6 +42,34 @@ namespace v8 {
 namespace internal {
 
 
+// Safe default is no features.
+unsigned CpuFeatures::supported_ = 0;
+unsigned CpuFeatures::enabled_ = 0;
+unsigned CpuFeatures::found_by_runtime_probing_ = 0;
+
+void CpuFeatures::Probe() {
+  // If the compiler is allowed to use fpu then we can use fpu too in our
+  // code generation.
+#if !defined(__mips__)
+  // For the simulator=mips build, use FPU when FLAG_enable_fpu is enabled.
+  if (FLAG_enable_fpu) {
+      supported_ |= 1u << FPU;
+  }
+#else
+  if (Serializer::enabled()) {
+    supported_ |= OS::CpuFeaturesImpliedByPlatform();
+    return;  // No features if we might serialize.
+  }
+
+  if (OS::MipsCpuHasFeature(FPU)) {
+    // This implementation also sets the FPU flags if
+    // runtime detection of FPU returns true.
+    supported_ |= 1u << FPU;
+    found_by_runtime_probing_ |= 1u << FPU;
+  }
+#endif
+}
+
 
 const Register no_reg = { -1 };
 
@@ -467,6 +495,19 @@ void Assembler::GenInstrRegister(Opcode opcode,
 
 
 void Assembler::GenInstrRegister(Opcode opcode,
+                                 Register rs,
+                                 Register rt,
+                                 uint16_t msb,
+                                 uint16_t lsb,
+                                 SecondaryField func) {
+  ASSERT(rs.is_valid() && rt.is_valid() && is_uint5(msb) && is_uint5(lsb));
+  Instr instr = opcode | (rs.code() << kRsShift) | (rt.code() << kRtShift)
+      | (msb << kRdShift) | (lsb << kSaShift) | func;
+  emit(instr);
+}
+
+
+void Assembler::GenInstrRegister(Opcode opcode,
                                  SecondaryField fmt,
                                  FPURegister ft,
                                  FPURegister fs,
@@ -782,6 +823,16 @@ void Assembler::lbu(Register rd, const MemOperand& rs) {
 }
 
 
+void Assembler::lh(Register rd, const MemOperand& rs) {
+  GenInstrImmediate(LH, rs.rm(), rd, rs.offset_);
+}
+
+
+void Assembler::lhu(Register rd, const MemOperand& rs) {
+  GenInstrImmediate(LHU, rs.rm(), rd, rs.offset_);
+}
+
+
 void Assembler::lw(Register rd, const MemOperand& rs) {
   GenInstrImmediate(LW, rs.rm(), rd, rs.offset_);
 }
@@ -789,6 +840,11 @@ void Assembler::lw(Register rd, const MemOperand& rs) {
 
 void Assembler::sb(Register rd, const MemOperand& rs) {
   GenInstrImmediate(SB, rs.rm(), rd, rs.offset_);
+}
+
+
+void Assembler::sh(Register rd, const MemOperand& rs) {
+  GenInstrImmediate(SH, rs.rm(), rd, rs.offset_);
 }
 
 
@@ -892,6 +948,34 @@ void Assembler::sltiu(Register rt, Register rs, int32_t j) {
   GenInstrImmediate(SLTIU, rs, rt, j);
 }
 
+// Conditional move.
+void Assembler::movz(Register rd, Register rs, Register rt) {
+  GenInstrRegister(SPECIAL, rs, rt, rd, 0, MOVZ);
+}
+
+
+void Assembler::movn(Register rd, Register rs, Register rt) {
+  GenInstrRegister(SPECIAL, rs, rt, rd, 0, MOVN);
+}
+
+// Bit twiddling.
+void Assembler::clz(Register rd, Register rs) {
+  // Clz instr requires same GPR number in 'rd' and 'rt' fields.
+  GenInstrRegister(SPECIAL2, rs, rd, rd, 0, CLZ);
+}
+
+
+void Assembler::ins(Register rt, Register rs, uint16_t pos, uint16_t size) {
+  // Ins instr has 'rt' field as dest, and two uint5: msb, lsb
+  GenInstrRegister(SPECIAL3, rs, rt, pos + size - 1, pos, INS);
+}
+
+
+void Assembler::ext(Register rt, Register rs, uint16_t pos, uint16_t size) {
+  // Ext instr has 'rt' field as dest, and two uint5: msb, lsb
+  GenInstrRegister(SPECIAL3, rs, rt, pos + size - 1, pos, EXT);
+}
+
 
 //--------Coprocessor-instructions----------------
 
@@ -902,7 +986,14 @@ void Assembler::lwc1(FPURegister fd, const MemOperand& src) {
 
 
 void Assembler::ldc1(FPURegister fd, const MemOperand& src) {
-  GenInstrImmediate(LDC1, src.rm(), fd, src.offset_);
+  // Workaround for non-8-byte alignment of HeapNumber, convert 64-bit
+  // load to two 32-bit loads. This really should be done in macro-assembler,
+  // but this should be temporary....
+  GenInstrImmediate(LWC1, src.rm(), fd, src.offset_);
+  FPURegister nextfpreg;
+  nextfpreg.setcode(fd.code() + 1);
+  GenInstrImmediate(LWC1, src.rm(), nextfpreg, src.offset_ + 4);
+  // GenInstrImmediate(LDC1, src.rm(), fd, src.offset_);
 }
 
 
@@ -912,7 +1003,14 @@ void Assembler::swc1(FPURegister fd, const MemOperand& src) {
 
 
 void Assembler::sdc1(FPURegister fd, const MemOperand& src) {
-  GenInstrImmediate(SDC1, src.rm(), fd, src.offset_);
+  // Workaround for non-8-byte alignment of HeapNumber, convert 64-bit
+  // store to two 32-bit stores. This really should be done in macro-assembler,
+  // but this should be temporary....
+  GenInstrImmediate(SWC1, src.rm(), fd, src.offset_);
+  FPURegister nextfpreg;
+  nextfpreg.setcode(fd.code() + 1);
+  GenInstrImmediate(SWC1, src.rm(), nextfpreg, src.offset_ + 4);
+  // GenInstrImmediate(SDC1, src.rm(), fd, src.offset_);
 }
 
 
