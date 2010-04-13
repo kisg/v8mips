@@ -2204,6 +2204,7 @@ void CodeGenerator::VisitRegExpLiteral(RegExpLiteral* node) {
 void CodeGenerator::VisitObjectLiteral(ObjectLiteral* node) {
   UNIMPLEMENTED_MIPS();
   __ break_(__LINE__);
+  frame_->EmitPush(zero_reg);
 }
 
 
@@ -2713,6 +2714,7 @@ void CodeGenerator::GenerateFastCharCodeAt(ZoneList<Expression*>* args) {
 void CodeGenerator::GenerateCharFromCode(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
   __ break_(__LINE__);
+  frame_->EmitPush(zero_reg);
 }
 
 
@@ -2726,7 +2728,7 @@ void CodeGenerator::GenerateIsArray(ZoneList<Expression*>* args) {
   frame_->EmitPop(a0);
   __ And(t0, a0, Operand(kSmiTagMask));
   __ Xor(condReg1, t0, Operand(kSmiTagMask));
-  __ li(condReg2, Operand(zero_reg));
+  __ mov(condReg2, zero_reg);
   answer.Branch(eq, t0, Operand(zero_reg));
   // It is a heap object - get the map. Check if the object is a JS array.
   __ GetObjectType(a0, t1, condReg1);
@@ -2767,6 +2769,7 @@ void CodeGenerator::GenerateIsConstructCall(ZoneList<Expression*>* args) {
 void CodeGenerator::GenerateArgumentsLength(ZoneList<Expression*>* args) {
   UNIMPLEMENTED_MIPS();
   __ break_(__LINE__);
+  frame_->EmitPush(zero_reg);
 }
 
 
@@ -3006,8 +3009,8 @@ void CodeGenerator::VisitUnaryOperation(UnaryOperation* node) {
       }
 
       case Token::VOID:
-        UNIMPLEMENTED_MIPS();
-        __ break_(__LINE__);
+        // Just load the value in v0, which will be pushed next.
+        __ LoadRoot(v0, Heap::kUndefinedValueRootIndex);
         break;
 
       case Token::ADD: {
