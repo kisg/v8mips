@@ -194,7 +194,7 @@ LIBRARY_FLAGS = {
     'arch:mips': {
       'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS'],
       'simulator:none': {
-        'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2', '-fno-inline'],
+        'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2', '-fno-inline', '-mhard-float'],
         'LDFLAGS':      ['-EL']
       }
     },
