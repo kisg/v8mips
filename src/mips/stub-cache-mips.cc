@@ -266,8 +266,16 @@ void StubCompiler::GenerateLoadConstant(JSObject* object,
                                         Object* value,
                                         String* name,
                                         Label* miss) {
-  UNIMPLEMENTED_MIPS();
-  __ break_(__LINE__);
+  // Check that the receiver isn't a smi.
+  __ BranchOnSmi(receiver, miss, scratch1);
+
+  // Check that the maps haven't changed.
+  Register reg =
+      CheckPrototypes(object, receiver, holder, scratch1, scratch2, name, miss);
+
+  // Return the constant value.
+  __ li(v0, Operand(Handle<Object>(value)));
+  __ Ret();
 }
 
 
@@ -367,7 +375,7 @@ Object* CallStubCompiler::CompileCallConstant(Object* object,
                                               JSFunction* function,
                                               String* name,
                                               CheckType check) {
-  // r2: name
+  // a2: name
   // ra: return address
   SharedFunctionInfo* function_info = function->shared();
   if (function_info->HasCustomCallGenerator()) {
@@ -395,7 +403,7 @@ Object* CallStubCompiler::CompileCallConstant(Object* object,
   switch (check) {
     case RECEIVER_MAP_CHECK:
       // Check that the maps haven't changed.
-      CheckPrototypes(JSObject::cast(object), a1, holder, a3, a2, name, &miss);
+      CheckPrototypes(JSObject::cast(object), a1, holder, a3, a0, name, &miss);
 
       // Patch the receiver on the stack with the global proxy if
       // necessary.
@@ -406,48 +414,66 @@ Object* CallStubCompiler::CompileCallConstant(Object* object,
       break;
 
     case STRING_CHECK:
-      // Check that the object is a two-byte string or a symbol.
-      __ GetObjectType(a1, a2, a2);
-      __ Branch(Ugreater_equal, &miss, a2, Operand(FIRST_NONSTRING_TYPE));
-      // Check that the maps starting from the prototype haven't changed.
-      GenerateLoadGlobalFunctionPrototype(masm(),
-                                          Context::STRING_FUNCTION_INDEX,
-                                          a2);
-      CheckPrototypes(JSObject::cast(object->GetPrototype()), a2, holder, a3,
-                      a1, name, &miss);
+  __ break_(__LINE__);
+      if (!function->IsBuiltin()) {
+        // Calling non-builtins with a value as receiver requires boxing.
+        __ jmp(&miss);
+      } else {
+        // Check that the object is a two-byte string or a symbol.
+        __ GetObjectType(a1, a3, a3);
+        __ Branch(Ugreater_equal, &miss, a3, Operand(FIRST_NONSTRING_TYPE));
+        // Check that the maps starting from the prototype haven't changed.
+        GenerateLoadGlobalFunctionPrototype(masm(),
+                                            Context::STRING_FUNCTION_INDEX,
+                                            a0);
+        CheckPrototypes(JSObject::cast(object->GetPrototype()), a0, holder, a3,
+                        a1, name, &miss);
+      }
       break;
 
     case NUMBER_CHECK: {
+  __ break_(__LINE__);
+      if (!function->IsBuiltin()) {
+        // Calling non-builtins with a value as receiver requires boxing.
+        __ jmp(&miss);
+      } else {
       Label fast;
-      // Check that the object is a smi or a heap number.
-      __ And(t1, a1, Operand(kSmiTagMask));
-      __ Branch(eq, &fast, t1, Operand(zero_reg));
-      __ GetObjectType(a1, a2, a2);
-      __ Branch(ne, &miss, a2, Operand(HEAP_NUMBER_TYPE));
-      __ bind(&fast);
-      // Check that the maps starting from the prototype haven't changed.
-      GenerateLoadGlobalFunctionPrototype(masm(),
-                                          Context::NUMBER_FUNCTION_INDEX,
-                                          a2);
-      CheckPrototypes(JSObject::cast(object->GetPrototype()), a2, holder, a3,
-                      a1, name, &miss);
+        // Check that the object is a smi or a heap number.
+        __ And(t1, a1, Operand(kSmiTagMask));
+        __ Branch(eq, &fast, t1, Operand(zero_reg));
+        __ GetObjectType(a1, a0, a0);
+        __ Branch(ne, &miss, a0, Operand(HEAP_NUMBER_TYPE));
+        __ bind(&fast);
+        // Check that the maps starting from the prototype haven't changed.
+        GenerateLoadGlobalFunctionPrototype(masm(),
+                                            Context::NUMBER_FUNCTION_INDEX,
+                                            a0);
+        CheckPrototypes(JSObject::cast(object->GetPrototype()), a0, holder, a3,
+                        a1, name, &miss);
+      }
       break;
     }
-//
+
     case BOOLEAN_CHECK: {
-      Label fast;
-      // Check that the object is a boolean.
-      __ LoadRoot(t0, Heap::kTrueValueRootIndex);
-      __ Branch(eq, &fast, a1, Operand(t0));
-      __ LoadRoot(t0, Heap::kFalseValueRootIndex);
-      __ Branch(ne, &miss, a1, Operand(t0));
-      __ bind(&fast);
-      // Check that the maps starting from the prototype haven't changed.
-      GenerateLoadGlobalFunctionPrototype(masm(),
-                                          Context::BOOLEAN_FUNCTION_INDEX,
-                                          a2);
-      CheckPrototypes(JSObject::cast(object->GetPrototype()), a2, holder, a3,
-                      a1, name, &miss);
+  __ break_(__LINE__);
+      if (!function->IsBuiltin()) {
+        // Calling non-builtins with a value as receiver requires boxing.
+        __ jmp(&miss);
+      } else {
+        Label fast;
+        // Check that the object is a boolean.
+        __ LoadRoot(t0, Heap::kTrueValueRootIndex);
+        __ Branch(eq, &fast, a1, Operand(t0));
+        __ LoadRoot(t0, Heap::kFalseValueRootIndex);
+        __ Branch(ne, &miss, a1, Operand(t0));
+        __ bind(&fast);
+        // Check that the maps starting from the prototype haven't changed.
+        GenerateLoadGlobalFunctionPrototype(masm(),
+                                            Context::BOOLEAN_FUNCTION_INDEX,
+                                            a0);
+        CheckPrototypes(JSObject::cast(object->GetPrototype()), a0, holder, a3,
+                        a1, name, &miss);
+      }
       break;
     }
 
@@ -504,14 +530,30 @@ Object* CallStubCompiler::CompileCallGlobal(JSObject* object,
   }
 
   // Check that the maps haven't changed.
-  CheckPrototypes(object, a0, holder, a3, a2, name, &miss);
+  CheckPrototypes(object, a0, holder, a3, a1, name, &miss);
 
   // Get the value from the cell.
   __ li(a3, Operand(Handle<JSGlobalPropertyCell>(cell)));
   __ lw(a1, FieldMemOperand(a3, JSGlobalPropertyCell::kValueOffset));
 
   // Check that the cell contains the same function.
-  __ Branch(ne, &miss, a1, Operand(Handle<JSFunction>(function)));
+  if (Heap::InNewSpace(function)) {
+    // We can't embed a pointer to a function in new space so we have
+    // to verify that the shared function info is unchanged. This has
+    // the nice side effect that multiple closures based on the same
+    // function can all use this call IC. Before we load through the
+    // function, we have to verify that it still is a function.
+    __ BranchOnSmi(a1, &miss, t0);
+    __ GetObjectType(a1, a3, a3);
+    __ Branch(ne, &miss, a3, Operand(JS_FUNCTION_TYPE));
+
+    // Check the shared function info. Make sure it hasn't changed.
+    __ li(a3, Operand(Handle<SharedFunctionInfo>(function->shared())));
+    __ lw(t0, FieldMemOperand(a1, JSFunction::kSharedFunctionInfoOffset));
+    __ Branch(ne, &miss, t0, Operand(a3));
+  } else {
+    __ Branch(ne, &miss, a1, Operand(Handle<JSFunction>(function)));
+  }
 
   // Patch the receiver on the stack with the global proxy if
   // necessary.
@@ -520,11 +562,13 @@ Object* CallStubCompiler::CompileCallGlobal(JSObject* object,
     __ sw(a3, MemOperand(sp, argc * kPointerSize));
   }
 
+  __ nop(); __ nop(); __ nop(); __ nop(); __ nop(); __ nop(); __ nop();
+
   // Setup the context (function already in r1).
   __ lw(cp, FieldMemOperand(a1, JSFunction::kContextOffset));
 
   // Jump to the cached code (tail call).
-  __ IncrementCounter(&Counters::call_global_inline, 1, a2, a3);
+  __ IncrementCounter(&Counters::call_global_inline, 1, a1, a3);
   ASSERT(function->is_compiled());
   Handle<Code> code(function->code());
   ParameterCount expected(function->shared()->formal_parameter_count());
@@ -533,6 +577,7 @@ Object* CallStubCompiler::CompileCallGlobal(JSObject* object,
 
   // Handle call cache miss.
   __ bind(&miss);
+  __ break_(__LINE__);
   __ IncrementCounter(&Counters::call_global_inline_miss, 1, a1, a3);
   Handle<Code> ic = ComputeCallMiss(arguments().immediate());
   __ Jump(ic, RelocInfo::CODE_TARGET);
@@ -643,9 +688,21 @@ Object* LoadStubCompiler::CompileLoadConstant(JSObject* object,
                                               JSObject* holder,
                                               Object* value,
                                               String* name) {
-  UNIMPLEMENTED_MIPS();
+  // a2    : name
+  // ra    : return address
+  // [sp] : receiver
+  Label miss;
+
+  __ lw(a0, MemOperand(sp, 0));
+
   __ break_(__LINE__);
-  return reinterpret_cast<Object*>(NULL);   // UNIMPLEMENTED RETURN
+  GenerateLoadConstant(object, holder, a0, a3, a1, value, name, &miss);
+  __ bind(&miss);
+  __ break_(__LINE__);
+  GenerateLoadMiss(masm(), Code::LOAD_IC);
+
+  // Return the generated code.
+  return GetCode(CONSTANT_FUNCTION, name);
 }
 
 
@@ -739,6 +796,7 @@ Object* KeyedLoadStubCompiler::CompileLoadConstant(String* name,
 
   __ Branch(ne, &miss, a2, Operand(Handle<String>(name)));
 
+  __ break_(__LINE__);
   GenerateLoadConstant(receiver, holder, a0, a3, a1, value, name, &miss);
   __ bind(&miss);
   GenerateLoadMiss(masm(), Code::KEYED_LOAD_IC);
