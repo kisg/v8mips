@@ -86,6 +86,7 @@ void VirtualFrame::Exit() {
 
 void VirtualFrame::AllocateStackSlots() {
   int count = local_count();
+  __ LoadRoot(t2, Heap::kStackLimitRootIndex);
   if (count > 0) {
     Comment cmnt(masm(), "[ Allocate space for locals");
     Adjust(count);
@@ -96,6 +97,7 @@ void VirtualFrame::AllocateStackSlots() {
       __ sw(t0, MemOperand(sp, (count-i-1)*kPointerSize));
     }
   }
+  __ tge(t2, sp, __LINE__);
 }
 
 
