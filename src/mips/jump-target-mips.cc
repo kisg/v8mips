@@ -41,6 +41,12 @@ namespace internal {
 
 #define __ ACCESS_MASM(cgen()->masm())
 
+// BRANCH_ARGS_CHECK checks that conditional jump arguments are correct.
+#define BRANCH_ARGS_CHECK(cond, rs, rt) ASSERT(                                \
+    (cond == cc_always && rs.is(zero_reg) && rt.rm().is(zero_reg)) ||          \
+    (cond != cc_always && (!rs.is(zero_reg) || !rt.rm().is(zero_reg)))) 
+
+
 void JumpTarget::DoJump() {
   ASSERT(cgen()->has_valid_frame());
   // Live non-frame registers are not allowed at unconditional jumps
@@ -78,6 +84,7 @@ void JumpTarget::DoJump() {
 
 void JumpTarget::DoBranch(Condition cc, Hint ignored,
     Register src1, const Operand& src2) {
+  BRANCH_ARGS_CHECK(cc, src1, src2);
   ASSERT(cgen()->has_valid_frame());
 
   if (is_bound()) {
@@ -210,6 +217,7 @@ void BreakTarget::Bind(Result* arg) {
 
 
 #undef __
+#undef BRANCH_ARGS_CHECK
 
 
 } }  // namespace v8::internal
