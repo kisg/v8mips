@@ -2361,7 +2361,7 @@ void CodeGenerator::VisitObjectLiteral(ObjectLiteral* node) {
       }
       case ObjectLiteral::Property::SETTER: {
         __ lw(a0, frame_->Top());
-        frame_->EmitPush(v0);
+        frame_->EmitPush(a0);
         LoadAndSpill(key);
         __ li(a0, Operand(Smi::FromInt(1)));
         frame_->EmitPush(a0);
@@ -2371,7 +2371,7 @@ void CodeGenerator::VisitObjectLiteral(ObjectLiteral* node) {
       }
       case ObjectLiteral::Property::GETTER: {
         __ lw(a0, frame_->Top());
-        frame_->EmitPush(v0);
+        frame_->EmitPush(a0);
         LoadAndSpill(key);
         __ li(a0, Operand(Smi::FromInt(0)));
         frame_->EmitPush(a0);
@@ -4869,8 +4869,8 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
   // Handle normal exception.
   __ jmp(throw_normal_exception);
 
-  __ bind(&retry);  // Pass last failure (v0) as parameter (a0) when retrying.
-  __ mov(a0, v0);
+  __ bind(&retry);
+  // Last failure (v0) will be moved to (a0) for parameter when retrying.
 }
 
 void CEntryStub::Generate(MacroAssembler* masm) {
