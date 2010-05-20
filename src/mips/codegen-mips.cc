@@ -5650,10 +5650,17 @@ static void HandleBinaryOpSlowCases(MacroAssembler* masm,
   Label slow, slow_pop_2_first, do_the_call;
   Label a0_is_smi, a1_is_smi, finished_loading_a0, finished_loading_a1;
 
+  if (operation == Token::MOD || operation == Token::DIV) {
+    // If the divisor is zero for MOD or DIV, go to
+    // the builtin code to return NaN.
+    __ Branch(&slow, eq, a0, Operand(zero_reg));
+  }
+
   // Smi-smi case (overflow).
   // Since both are Smis there is no heap number to overwrite, so allocate.
   // The new heap number is in t0. t1 and t2 are scratch.
   __ AllocateHeapNumber(t0, t1, t2, &slow);
+
 
   // If we have floating point hardware, inline ADD, SUB, MUL, and DIV,
   // using registers f12 and f14 for the double values.
@@ -6338,8 +6345,8 @@ void GenericBinaryOpStub::Generate(MacroAssembler* masm) {
       __ bind(&slow);
       HandleBinaryOpSlowCases(masm,
                               &not_smi,
-                              op_ == Token::MOD ? Builtins::MOD : Builtins::DIV,
-                              op_,
+                              Builtins::DIV,
+                              Token::DIV,
                               mode_);
       break;
     }
@@ -6350,11 +6357,11 @@ void GenericBinaryOpStub::Generate(MacroAssembler* masm) {
       // t2 = x | y at entry.
       __ And(t3, t2, Operand(kSmiTagMask));
       __ Branch(&not_smi, ne, t3, Operand(zero_reg));
-      // Check for divisor of 0.
-      __ Branch(&slow, eq, t0, Operand(zero_reg));
       // Remove tags, preserving sign.
       __ sra(t0, a0, kSmiTagSize);
       __ sra(t1, a1, kSmiTagSize);
+      // Check for divisor of 0.
+      __ Branch(&slow, eq, t0, Operand(zero_reg));
       __ Div(t1, Operand(t0));
       __ mfhi(v0);
       __ sll(v0, v0, kSmiTagSize);  // Smi tag return value.
@@ -6368,8 +6375,8 @@ void GenericBinaryOpStub::Generate(MacroAssembler* masm) {
       __ bind(&slow);
       HandleBinaryOpSlowCases(masm,
                               &not_smi,
-                              op_ == Token::MOD ? Builtins::MOD : Builtins::DIV,
-                              op_,
+                              Builtins::MOD,
+                              Token::MOD,
                               mode_);
       break;
     }
