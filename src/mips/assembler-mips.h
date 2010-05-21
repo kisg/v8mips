@@ -474,6 +474,8 @@ class Assembler : public Malloced {
   void srlv(Register rd, Register rt, Register rs);
   void sra(Register rt, Register rd, uint16_t sa);
   void srav(Register rt, Register rd, Register rs);
+  void rotr(Register rd, Register rt, uint16_t sa);
+  void rotrv(Register rd, Register rt, Register rs);
 
 
   //------------Memory-instructions-------------
