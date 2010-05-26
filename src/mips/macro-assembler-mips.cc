@@ -675,7 +675,6 @@ void MacroAssembler::Branch(int16_t offset,
     nop();
 }
 
-
 void MacroAssembler::Branch(int16_t offset, Condition cond, Register rs,
                             const Operand& rt,
                             bool ProtectBranchDelaySlot) {
@@ -687,68 +686,206 @@ void MacroAssembler::Branch(int16_t offset, Condition cond, Register rs,
     // We don't want any other register but scratch clobbered.
     ASSERT(!scratch.is(rs) && !scratch.is(rt.rm_));
     r2 = rt.rm_;
-  } else if (cond != cc_always) {
-    // We don't want any other register but scratch clobbered.
-    ASSERT(!scratch.is(rs));
-    r2 = scratch;
-    li(r2, rt);
-  }
-
-  switch (cond) {
-    case cc_always:
-      b(offset);
-      break;
-    case eq:
-      beq(rs, r2, offset);
-      break;
-    case ne:
-      bne(rs, r2, offset);
-      break;
-
+    switch (cond) {
+      case cc_always:
+        b(offset);
+        break;
+      case eq:
+        beq(rs, r2, offset);
+        break;
+      case ne:
+        bne(rs, r2, offset);
+        break;
       // Signed comparison
-    case greater:
-      slt(scratch, r2, rs);
-      bne(scratch, zero_reg, offset);
-      break;
-    case greater_equal:
-      slt(scratch, rs, r2);
-      beq(scratch, zero_reg, offset);
-      break;
-    case less:
-      slt(scratch, rs, r2);
-      bne(scratch, zero_reg, offset);
-      break;
-    case less_equal:
-      slt(scratch, r2, rs);
-      beq(scratch, zero_reg, offset);
-      break;
-
+      case greater:
+        if (r2.is(zero_reg)) {
+          bgtz(rs, offset);
+        } else {
+          slt(scratch, r2, rs);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case greater_equal:
+        if (r2.is(zero_reg)) {
+          bgez(rs, offset);
+        } else {
+          slt(scratch, rs, r2);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+      case less:
+        if (r2.is(zero_reg)) {
+          bltz(rs, offset);
+        } else {
+          slt(scratch, rs, r2);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case less_equal:
+        if (r2.is(zero_reg)) {
+          blez(rs, offset);
+        } else {
+          slt(scratch, r2, rs);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
       // Unsigned comparison.
-    case Ugreater:
-      sltu(scratch, r2, rs);
-      bne(scratch, zero_reg, offset);
-      break;
-    case Ugreater_equal:
-      sltu(scratch, rs, r2);
-      beq(scratch, zero_reg, offset);
-      break;
-    case Uless:
-      sltu(scratch, rs, r2);
-      bne(scratch, zero_reg, offset);
-      break;
-    case Uless_equal:
-      sltu(scratch, r2, rs);
-      beq(scratch, zero_reg, offset);
-      break;
-
-    default:
-      UNREACHABLE();
+      case Ugreater:
+        if (r2.is(zero_reg)) {
+          bgtz(rs, offset);
+        } else {
+          sltu(scratch, r2, rs);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case Ugreater_equal:
+        if (r2.is(zero_reg)) {
+          bgez(rs, offset);
+        } else {
+          sltu(scratch, rs, r2);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+      case Uless:
+        if (r2.is(zero_reg)) {
+          b(offset);
+        } else {
+          sltu(scratch, rs, r2);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case Uless_equal:
+        if (r2.is(zero_reg)) {
+          b(offset);
+        } else {
+          sltu(scratch, r2, rs);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+      default:
+        UNREACHABLE();
+    }
+  } else {
+    // Be careful to always use shifted_branch_offset only just before the
+    // branch instruction, as the location will be remember for patching the
+    // target.
+    switch (cond) {
+      case cc_always:
+        b(offset);
+        break;
+      case eq:
+        // We don't want any other register but scratch clobbered.
+        ASSERT(!scratch.is(rs));
+        r2 = scratch;
+        li(r2, rt);
+        beq(rs, r2, offset);
+        break;
+      case ne:
+        // We don't want any other register but scratch clobbered.
+        ASSERT(!scratch.is(rs));
+        r2 = scratch;
+        li(r2, rt);
+        bne(rs, r2, offset);
+        break;
+      // Signed comparison
+      case greater:
+        if (rt.imm32_ == 0) {
+          bgtz(rs, offset);
+        } else {
+          r2 = scratch;
+          li(r2, rt);
+          slt(scratch, r2, rs);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case greater_equal:
+        if (rt.imm32_ == 0) {
+          bgez(rs, offset);
+        } else if (is_int16(rt.imm32_)) {
+          slti(scratch, rs, rt.imm32_);
+          beq(scratch, zero_reg, offset);
+        } else {
+          r2 = scratch;
+          li(r2, rt);
+          sltu(scratch, rs, r2);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+      case less:
+        if (rt.imm32_ == 0) {
+          bltz(rs, offset);
+        } else if (is_int16(rt.imm32_)) {
+          slti(scratch, rs, rt.imm32_);
+          bne(scratch, zero_reg, offset);
+        } else {
+          r2 = scratch;
+          slt(scratch, rs, r2);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case less_equal:
+        if (rt.imm32_ == 0) {
+          blez(rs, offset);
+        } else {
+          r2 = scratch;
+          li(r2, rt);
+          slt(scratch, r2, rs);
+          beq(scratch, zero_reg, offset);
+       }
+       break;
+      // Unsigned comparison.
+      case Ugreater:
+        if (rt.imm32_ == 0) {
+          bgtz(rs, offset);
+        } else {
+          r2 = scratch;
+          li(r2, rt);
+          sltu(scratch, r2, rs);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case Ugreater_equal:
+        if (rt.imm32_ == 0) {
+          bgez(rs, offset);
+        } else if (is_int16(rt.imm32_)) {
+          sltiu(scratch, rs, rt.imm32_);
+          beq(scratch, zero_reg, offset);
+        } else {
+          r2 = scratch;
+          sltu(scratch, rs, r2);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+      case Uless:
+        if (rt.imm32_ == 0) {
+          b(offset);
+        } else if (is_int16(rt.imm32_)) {
+          sltiu(scratch, rs, rt.imm32_);
+          bne(scratch, zero_reg, offset);
+        } else {
+          r2 = scratch;
+          sltu(scratch, rs, r2);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case Uless_equal:
+        if (rt.imm32_ == 0) {
+          b(offset);
+        } else {
+          r2 = scratch;
+          li(r2, rt);
+          sltu(scratch, r2, rs);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+      default:
+        UNREACHABLE();
+    }
   }
   // Emit a nop in the branch delay slot if required.
   if (ProtectBranchDelaySlot)
     nop();
 }
-
 
 void MacroAssembler::Branch(Label* L,
                             bool ProtectBranchDelaySlot) {
@@ -762,7 +899,6 @@ void MacroAssembler::Branch(Label* L,
     nop();
 }
 
-
 void MacroAssembler::Branch(Label* L, Condition cond, Register rs,
                             const Operand& rt,
                             bool ProtectBranchDelaySlot) {
@@ -773,84 +909,249 @@ void MacroAssembler::Branch(Label* L, Condition cond, Register rs,
   Register scratch = at;
   if (rt.is_reg()) {
     r2 = rt.rm_;
-  } else if (cond != cc_always) {
-    r2 = scratch;
-    li(r2, rt);
+    // Be careful to always use shifted_branch_offset only just before the
+    // branch instruction, as the location will be remember for patching the
+    // target.
+    switch (cond) {
+      case cc_always:
+        offset = shifted_branch_offset(L, false);
+        b(offset);
+        break;
+      case eq:
+        offset = shifted_branch_offset(L, false);
+        beq(rs, r2, offset);
+        break;
+      case ne:
+        offset = shifted_branch_offset(L, false);
+        bne(rs, r2, offset);
+        break;
+      // Signed comparison
+      case greater:
+        if (r2.is(zero_reg)) {
+          offset = shifted_branch_offset(L, false);
+          bgtz(rs, offset);
+        } else {
+          slt(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case greater_equal:
+        if (r2.is(zero_reg)) {
+          offset = shifted_branch_offset(L, false);
+          bgez(rs, offset);
+        } else {
+          slt(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+      case less:
+        if (r2.is(zero_reg)) {
+          offset = shifted_branch_offset(L, false);
+          bltz(rs, offset);
+        } else {
+          slt(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case less_equal:
+        if (r2.is(zero_reg)) {
+          offset = shifted_branch_offset(L, false);
+          blez(rs, offset);
+        } else {
+          slt(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+      // Unsigned comparison.
+      case Ugreater:
+        if (r2.is(zero_reg)) {
+          offset = shifted_branch_offset(L, false);
+           bgtz(rs, offset);
+        } else {
+          sltu(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case Ugreater_equal:
+        if (r2.is(zero_reg)) {
+          offset = shifted_branch_offset(L, false);
+          bgez(rs, offset);
+        } else {
+          sltu(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+      case Uless:
+        if (r2.is(zero_reg)) {
+          offset = shifted_branch_offset(L, false);
+          b(offset);
+        } else {
+          sltu(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case Uless_equal:
+        if (r2.is(zero_reg)) {
+          offset = shifted_branch_offset(L, false);
+          b(offset);
+        } else {
+          sltu(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+      default:
+        UNREACHABLE();
+    }
+  } else {
+    // Be careful to always use shifted_branch_offset only just before the
+    // branch instruction, as the location will be remember for patching the
+    // target.
+    switch (cond) {
+      case cc_always:
+        offset = shifted_branch_offset(L, false);
+        b(offset);
+        break;
+      case eq:
+        r2 = scratch;
+        li(r2, rt);
+        offset = shifted_branch_offset(L, false);
+        beq(rs, r2, offset);
+        break;
+      case ne:
+        r2 = scratch;
+        li(r2, rt);
+        offset = shifted_branch_offset(L, false);
+        bne(rs, r2, offset);
+        break;
+      // Signed comparison
+      case greater:
+        if (rt.imm32_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          bgtz(rs, offset);
+        } else {
+          r2 = scratch;
+          li(r2, rt);
+          slt(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+        case greater_equal:
+        if (rt.imm32_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          bgez(rs, offset);
+        } else if (is_int16(rt.imm32_)) {
+          slti(scratch, rs, rt.imm32_);
+          offset = shifted_branch_offset(L, false);
+          beq(scratch, zero_reg, offset);
+        } else {
+          r2 = scratch;
+          li(r2, rt);
+          sltu(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+      case less:
+        if (rt.imm32_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          bltz(rs, offset);
+        } else if (is_int16(rt.imm32_)) {
+          slti(scratch, rs, rt.imm32_);
+          offset = shifted_branch_offset(L, false);
+          bne(scratch, zero_reg, offset);
+        } else {
+          r2 = scratch;
+          slt(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case less_equal:
+        if (rt.imm32_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          blez(rs, offset);
+        } else {
+          r2 = scratch;
+          li(r2, rt);
+          slt(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+      // Unsigned comparison.
+      case Ugreater:
+        if (rt.imm32_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          bgtz(rs, offset);
+        } else {
+          r2 = scratch;
+          li(r2, rt);
+          sltu(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case Ugreater_equal:
+        if (rt.imm32_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          bgez(rs, offset);
+        } else if (is_int16(rt.imm32_)) {
+          sltiu(scratch, rs, rt.imm32_);
+          offset = shifted_branch_offset(L, false);
+          beq(scratch, zero_reg, offset);
+        } else {
+          r2 = scratch;
+          sltu(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+     case Uless:
+        if (rt.imm32_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          b(offset);
+        } else if (is_int16(rt.imm32_)) {
+          sltiu(scratch, rs, rt.imm32_);
+          offset = shifted_branch_offset(L, false);
+          bne(scratch, zero_reg, offset);
+        } else {
+          r2 = scratch;
+          sltu(scratch, rs, r2);
+          offset = shifted_branch_offset(L, false);
+          bne(scratch, zero_reg, offset);
+        }
+        break;
+      case Uless_equal:
+        if (rt.imm32_ == 0) {
+          offset = shifted_branch_offset(L, false);
+          b(offset);
+        } else {
+          r2 = scratch;
+          li(r2, rt);
+          sltu(scratch, r2, rs);
+          offset = shifted_branch_offset(L, false);
+          beq(scratch, zero_reg, offset);
+        }
+        break;
+      default:
+        UNREACHABLE();
+    }
   }
-
-  // Be careful to always use shifted_branch_offset only just before the branch
-  // instruction, as the location will be remember for patching the target.
-
-  switch (cond) {
-    case cc_always:
-      offset = shifted_branch_offset(L, false);
-      b(offset);
-      break;
-    case eq:
-      offset = shifted_branch_offset(L, false);
-      beq(rs, r2, offset);
-      break;
-    case ne:
-      offset = shifted_branch_offset(L, false);
-      bne(rs, r2, offset);
-      break;
-
-    // Signed comparison
-    case greater:
-      slt(scratch, r2, rs);
-      offset = shifted_branch_offset(L, false);
-      bne(scratch, zero_reg, offset);
-      break;
-    case greater_equal:
-      slt(scratch, rs, r2);
-      offset = shifted_branch_offset(L, false);
-      beq(scratch, zero_reg, offset);
-      break;
-    case less:
-      slt(scratch, rs, r2);
-      offset = shifted_branch_offset(L, false);
-      bne(scratch, zero_reg, offset);
-      break;
-    case less_equal:
-      slt(scratch, r2, rs);
-      offset = shifted_branch_offset(L, false);
-      beq(scratch, zero_reg, offset);
-      break;
-
-    // Unsigned comparison.
-    case Ugreater:
-      sltu(scratch, r2, rs);
-      offset = shifted_branch_offset(L, false);
-      bne(scratch, zero_reg, offset);
-      break;
-    case Ugreater_equal:
-      sltu(scratch, rs, r2);
-      offset = shifted_branch_offset(L, false);
-      beq(scratch, zero_reg, offset);
-      break;
-    case Uless:
-      sltu(scratch, rs, r2);
-      offset = shifted_branch_offset(L, false);
-      bne(scratch, zero_reg, offset);
-      break;
-    case Uless_equal:
-      sltu(scratch, r2, rs);
-      offset = shifted_branch_offset(L, false);
-      beq(scratch, zero_reg, offset);
-      break;
-
-    default:
-      UNREACHABLE();
-  }
-
   // Check that offset could actually hold on an int16_t.
   ASSERT(is_int16(offset));
-
   // Emit a nop in the branch delay slot if required.
   if (ProtectBranchDelaySlot)
     nop();
 }
-
 
 // We need to use a bgezal or bltzal, but they can't be used directly with the
 // slt instructions. We could use sub or add instead but we would miss overflow
@@ -863,7 +1164,6 @@ void MacroAssembler::BranchAndLink(int16_t offset,
   if (ProtectBranchDelaySlot)
     nop();
 }
-
 
 void MacroAssembler::BranchAndLink(int16_t offset, Condition cond, Register rs,
                                    const Operand& rt,
@@ -944,7 +1244,6 @@ void MacroAssembler::BranchAndLink(int16_t offset, Condition cond, Register rs,
   if (ProtectBranchDelaySlot)
     nop();
 }
-
 
 void MacroAssembler::BranchAndLink(Label* L,
                                    bool ProtectBranchDelaySlot) {
@@ -1052,7 +1351,6 @@ void MacroAssembler::BranchAndLink(Label* L, Condition cond, Register rs,
   if (ProtectBranchDelaySlot)
     nop();
 }
-
 
 void MacroAssembler::Jump(const Operand& target,
                           bool ProtectBranchDelaySlot) {
