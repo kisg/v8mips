@@ -665,7 +665,7 @@ TEST(MIPS8) {
   __ rotr(t7, t0, 0x001c);
 
   // basic word store
-. __ sw(t1, MemOperand(a0, OFFSET_OF(T, result_rotr_4)) );
+  __ sw(t1, MemOperand(a0, OFFSET_OF(T, result_rotr_4)) );
   __ sw(t2, MemOperand(a0, OFFSET_OF(T, result_rotr_8)) );
   __ sw(t3, MemOperand(a0, OFFSET_OF(T, result_rotr_12)) );
   __ sw(t4, MemOperand(a0, OFFSET_OF(T, result_rotr_16)) );
@@ -738,12 +738,15 @@ TEST(MIPS9) {
   v8::HandleScope scope;
 
   MacroAssembler assm(NULL, 0);
-  Label jlabel, exit;
+  Label exit, exit2, exit3;
 
-  __ Branch(&jlabel, ge, a0, Operand(0x00));
+  __ Branch(&exit, ge, a0, Operand(0x00000000));
+  __ Branch(&exit2, ge, a0, Operand(0x00001FFF));
+  __ Branch(&exit3, ge, a0, Operand(0x0001FFFF));
 
-  __ bind(&jlabel);
   __ bind(&exit);
+  __ bind(&exit2);
+  __ bind(&exit3);
   __ jr(ra);
   __ nop();
 
