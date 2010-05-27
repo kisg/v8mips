@@ -762,4 +762,76 @@ TEST(MIPS9) {
 #endif
 }
 
+
+TEST(MIPS10) {
+  // Test conversions between doubles and long integers.
+  // Test hos the long ints map to FP regs pairs.
+  InitializeVM();
+  v8::HandleScope scope;
+
+  typedef struct {
+    double a;
+    double b;
+    int32_t dbl_mant;
+    int32_t dbl_exp;
+    int32_t long_hi;
+    int32_t long_lo;
+    int32_t b_long_hi;
+    int32_t b_long_lo;
+  } T;
+  T t;
+
+  Assembler assm(NULL, 0);
+  Label L, C;
+
+  // Load all structure elements to registers
+  __ ldc1(f0, MemOperand(a0, OFFSET_OF(T, a)));
+
+  // Save the raw bits of the double.
+  __ mfc1(t0, f0);
+  __ mfc1(t1, f1);
+  __ sw(t0, MemOperand(a0, OFFSET_OF(T, dbl_mant)));
+  __ sw(t1, MemOperand(a0, OFFSET_OF(T, dbl_exp)));
+
+  // Convert double in f0 to long, save hi/lo parts.
+  __ cvt_l_d(f0, f0);
+  __ mfc1(t0, f0);  // f0 has LS 32 bits of long.
+  __ mfc1(t1, f1);  // f1 has MS 32 bits of long.
+  __ sw(t0, MemOperand(a0, OFFSET_OF(T, long_lo)));
+  __ sw(t1, MemOperand(a0, OFFSET_OF(T, long_hi)));
+
+  // Convert the b long integers to double b.
+  __ lw(t0, MemOperand(a0, OFFSET_OF(T, b_long_lo)));
+  __ lw(t1, MemOperand(a0, OFFSET_OF(T, b_long_hi)));
+  __ mtc1(t0, f8);  // f8 has LS 32-bits.
+  __ mtc1(t1, f9);  // f9 has MS 32-bits.
+  __ cvt_d_l(f10, f8);
+  __ sdc1(f10, MemOperand(a0, OFFSET_OF(T, b)));
+
+  __ jr(ra);
+  __ nop();
+
+  CodeDesc desc;
+  assm.GetCode(&desc);
+  Object* code = Heap::CreateCode(desc,
+                                  NULL,
+                                  Code::ComputeFlags(Code::STUB),
+                                  Handle<Object>(Heap::undefined_value()));
+  CHECK(code->IsCode());
+#ifdef DEBUG
+  Code::cast(code)->Print();
+#endif
+  F3 f = FUNCTION_CAST<F3>(Code::cast(code)->entry());
+  t.a = 2.147483647e9;       // 0x7fffffff -> 0x41DFFFFFFFC00000 as double.
+  t.b_long_hi = 0x000000ff;  // 0xFF00FF00FF -> 0x426FE01FE01FE000 as double.
+  t.b_long_lo = 0x00ff00ff;
+  Object* dummy = CALL_GENERATED_CODE(f, &t, 0, 0, 0, 0);
+  USE(dummy);
+
+  CHECK_EQ(0x41DFFFFF, t.dbl_exp);
+  CHECK_EQ(0xFFC00000, t.dbl_mant);
+  CHECK_EQ(0, t.long_hi);
+  CHECK_EQ(0x7fffffff, t.long_lo);
+  CHECK_EQ(1.095233372415e12, t.b); // 0xFF00FF00FF -> 1.095233372415e12.
+}
 #undef __
