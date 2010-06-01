@@ -1422,6 +1422,8 @@ void Simulator::DecodeTypeImmediate(Instruction* instr) {
 
   // Used for memory instructions.
   int32_t addr = 0x0;
+  // Value to be written in memory
+  uint32_t mem_value = 0x0;
 
   // ---------- Configuration (and execution for REGIMM)
   switch (op) {
@@ -1539,6 +1541,17 @@ void Simulator::DecodeTypeImmediate(Instruction* instr) {
       addr = rs + se_imm16;
       alu_out = ReadH(addr, instr);
       break;
+    case LWL: {
+      // al_offset is an offset of the effective address within an aligned word
+      uint8_t al_offset = (rs + se_imm16) & v8i::kPointerAlignmentMask;
+      uint8_t byte_shift = v8i::kPointerAlignmentMask - al_offset;
+      uint32_t mask = (1 << byte_shift * 8) - 1;
+      addr = rs + se_imm16 - al_offset;
+      alu_out = ReadW(addr, instr);
+      alu_out <<= byte_shift * 8;
+      alu_out |= rt & mask;
+      }
+      break;
     case LW:
       addr = rs + se_imm16;
       alu_out = ReadW(addr, instr);
@@ -1551,14 +1564,42 @@ void Simulator::DecodeTypeImmediate(Instruction* instr) {
       addr = rs + se_imm16;
       alu_out = ReadHU(addr, instr);
       break;
+    case LWR: {
+      // al_offset is an offset of the effective address within an aligned word
+      uint8_t al_offset = (rs + se_imm16) & v8i::kPointerAlignmentMask;
+      uint8_t byte_shift = v8i::kPointerAlignmentMask - al_offset;
+      uint32_t mask = al_offset ? (~0 << (byte_shift + 1) * 8) : 0;
+      addr = rs + se_imm16 - al_offset;
+      alu_out = ReadW(addr, instr);
+      alu_out = static_cast<uint32_t> (alu_out) >> al_offset * 8;
+      alu_out |= rt & mask;
+      }
+      break;
     case SB:
       addr = rs + se_imm16;
       break;
     case SH:
       addr = rs + se_imm16;
       break;
+    case SWL: {
+      uint8_t al_offset = (rs + se_imm16) & v8i::kPointerAlignmentMask;
+      uint8_t byte_shift = v8i::kPointerAlignmentMask - al_offset;
+      uint32_t mask = byte_shift ? (~0 << (al_offset + 1) * 8) : 0;
+      addr = rs + se_imm16 - al_offset;
+      mem_value = ReadW(addr, instr) & mask;
+      mem_value |= static_cast<uint32_t>(rt) >> byte_shift * 8;
+      }
+      break;
     case SW:
       addr = rs + se_imm16;
+      break;
+    case SWR: {
+      uint8_t al_offset = (rs + se_imm16) & v8i::kPointerAlignmentMask;
+      uint32_t mask = (1 << al_offset * 8) - 1;
+      addr = rs + se_imm16 - al_offset;
+      mem_value = ReadW(addr, instr);
+      mem_value = (rt << al_offset * 8) | (mem_value & mask);
+      }
       break;
     case LWC1:
       addr = rs + se_imm16;
@@ -1612,9 +1653,11 @@ void Simulator::DecodeTypeImmediate(Instruction* instr) {
     // ------------- Memory instructions
     case LB:
     case LH:
+    case LWL:
     case LW:
     case LBU:
     case LHU:
+    case LWR:
       set_register(rt_reg, alu_out);
       break;
     case SB:
@@ -1623,8 +1666,14 @@ void Simulator::DecodeTypeImmediate(Instruction* instr) {
     case SH:
       WriteH(addr, static_cast<uint16_t>(rt), instr);
       break;
+    case SWL:
+      WriteW(addr, mem_value, instr);
+      break;
     case SW:
       WriteW(addr, rt, instr);
+      break;
+    case SWR:
+      WriteW(addr, mem_value, instr);
       break;
     case LWC1:
       set_fpu_register(ft_reg, alu_out);
