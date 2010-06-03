@@ -446,9 +446,7 @@ class Assembler : public Malloced {
   //-------Data-processing-instructions---------
 
   // Arithmetic.
-  void add(Register rd, Register rs, Register rt);
   void addu(Register rd, Register rs, Register rt);
-  void sub(Register rd, Register rs, Register rt);
   void subu(Register rd, Register rs, Register rt);
   void mult(Register rs, Register rt);
   void multu(Register rs, Register rt);
@@ -456,7 +454,6 @@ class Assembler : public Malloced {
   void divu(Register rs, Register rt);
   void mul(Register rd, Register rs, Register rt);
 
-  void addi(Register rd, Register rs, int32_t j);
   void addiu(Register rd, Register rs, int32_t j);
 
   // Logical.
@@ -477,6 +474,8 @@ class Assembler : public Malloced {
   void srlv(Register rd, Register rt, Register rs);
   void sra(Register rt, Register rd, uint16_t sa);
   void srav(Register rt, Register rd, Register rs);
+  void rotr(Register rd, Register rt, uint16_t sa);
+  void rotrv(Register rd, Register rt, Register rs);
 
 
   //------------Memory-instructions-------------

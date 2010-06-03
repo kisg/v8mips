@@ -183,6 +183,9 @@ class VirtualFrame : public ZoneObject {
   // shared return site. Emits code for spills.
   void PrepareForReturn();
 
+  // Number of local variables after when we use a loop for allocating.
+  static const int kLocalVarBound = 5;
+
   // Allocate and initialize the frame-allocated locals.
   void AllocateStackSlots();
 
@@ -299,6 +302,10 @@ class VirtualFrame : public ZoneObject {
   // removed from) the stack.
   void CallRuntime(Runtime::Function* f, int arg_count);
   void CallRuntime(Runtime::FunctionId id, int arg_count);
+
+#ifdef ENABLE_DEBUGGER_SUPPORT
+  void DebugBreak();
+#endif
 
   // Call runtime with sp aligned to 8 bytes.
   void CallAlignedRuntime(Runtime::Function* f, int arg_count);

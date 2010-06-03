@@ -195,7 +195,7 @@ LIBRARY_FLAGS = {
       'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS'],
       'simulator:none': {
         'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2', '-fno-inline', '-mhard-float'],
-        'LDFLAGS':      ['-EL']
+        'LDFLAGS':      ['-EL', '-static', '-static-libgcc']
       }
     },
     'simulator:mips': {
@@ -385,6 +385,13 @@ CCTEST_EXTRA_FLAGS = {
     'os:freebsd': {
       'LIBS':         ['execinfo', 'pthread']
     },
+    'arch:mips': {
+      'simulator:none': {
+        'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2', '-fno-inline', '-mhard-float'],
+        'LINKFLAGS':    ['-EL', '-static', '-static-libgcc'],
+        'LDFLAGS':      ['-EL', '-static', '-static-libgcc']
+      }
+    },
     'os:solaris': {
       'LIBS':         ['m', 'pthread', 'socket', 'nsl', 'rt'],
       'LINKFLAGS':    ['-mt']
@@ -483,9 +490,9 @@ SAMPLE_FLAGS = {
     'arch:mips': {
       'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS'],
       'simulator:none': {
-        'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2', '-fno-inline'],
-        'LINKFLAGS':    ['-EL'],
-        'LDFLAGS':      ['-EL']
+        'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2', '-fno-inline', '-mhard-float'],
+        'LINKFLAGS':    ['-EL', '-static', '-static-libgcc'],
+        'LDFLAGS':      ['-EL', '-static', '-static-libgcc']
       }
     },
     'simulator:arm': {
@@ -647,7 +654,7 @@ SIMPLE_OPTIONS = {
   'arch': {
     'values':['arm', 'ia32', 'x64', 'mips'],
     'default': ARCH_GUESS,
-    'help': 'the architecture to build for (' + ARCH_GUESS + ')'
+    'help': 'the architecture to build for (who knows)'
   },
   'regexp': {
     'values': ['native', 'interpreted'],

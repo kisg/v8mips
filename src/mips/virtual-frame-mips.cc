@@ -69,7 +69,22 @@ void VirtualFrame::MergeTo(VirtualFrame* expected) {
 
 
 void VirtualFrame::Enter() {
-  // TODO(MIPS): Implement DEBUG
+  Comment cmnt(masm(), "[ Enter JS frame");
+
+#ifdef DEBUG
+  // Verify that r1 contains a JS function.  The following code relies
+  // on r2 being available for use.
+  if (FLAG_debug_code) {
+    Label map_check, done;
+    __ BranchOnNotSmi(a1, &map_check, t1);
+    __ stop("VirtualFrame::Enter - a1 is not a function (smi check).");
+    __ bind(&map_check);
+    __ GetObjectType(a1, a2, a2);
+    __ Branch(&done, eq, a2, Operand(JS_FUNCTION_TYPE));
+    __ stop("VirtualFrame::Enter - a1 is not a function (map check).");
+    __ bind(&done);
+  }
+#endif  // DEBUG
 
   // We are about to push four values to the frame.
   Adjust(4);
@@ -86,16 +101,39 @@ void VirtualFrame::Exit() {
 
 void VirtualFrame::AllocateStackSlots() {
   int count = local_count();
+  __ LoadRoot(t2, Heap::kStackLimitRootIndex);
   if (count > 0) {
     Comment cmnt(masm(), "[ Allocate space for locals");
     Adjust(count);
-      // Initialize stack slots with 'undefined' value.
+    // Initialize stack slots with 'undefined' value.
     __ LoadRoot(t0, Heap::kUndefinedValueRootIndex);
     __ addiu(sp, sp, -count * kPointerSize);
-    for (int i = 0; i < count; i++) {
-      __ sw(t0, MemOperand(sp, (count-i-1)*kPointerSize));
+    if (count < kLocalVarBound) {
+      // For less locals the unrolled loop is more compact.
+      for (int i = 0; i < count; i++) {
+        __ sw(t0, MemOperand(sp, (count-i-1)*kPointerSize));
+      }
+    } else {
+      // For more locals a loop in generated code is more compact.
+      Label alloc_locals_loop;
+      __ li(a1, Operand(count));
+      __ mov(a2, sp);
+      __ bind(&alloc_locals_loop);
+      __ sw(t0, MemOperand(a2, 0));
+      __ Subu(a1, a1, Operand(1));
+      __ Branch(false, &alloc_locals_loop, gt, a1, Operand(zero_reg));
+      __ Addu(a2, a2, Operand(kPointerSize)); // Use branch-delay slot.
     }
   }
+  // Call the stub if lower.
+  Label stack_ok;
+  __ Branch(&stack_ok, Uless, t2, Operand(sp));
+  StackCheckStub stub;
+  __ Push(ra);
+  __ Call(Operand(reinterpret_cast<intptr_t>(stub.GetCode().location()),
+          RelocInfo::CODE_TARGET));
+  __ Pop(ra);
+  __ bind(&stack_ok);
 }
 
 
@@ -130,12 +168,14 @@ void VirtualFrame::StoreToFrameSlotAt(int index) {
 
 
 void VirtualFrame::PushTryHandler(HandlerType type) {
-  UNIMPLEMENTED_MIPS();
+  // Grow the expression stack by handler size less one (the return
+  // address in lr is already counted by a call instruction).
+  Adjust(kHandlerSize - 1);
+  __ PushTryHandler(IN_JAVASCRIPT, type);
 }
 
 
 void VirtualFrame::RawCallStub(CodeStub* stub) {
-  // UNIMPLEMENTED_MIPS();
   ASSERT(cgen()->HasValidEntryRegisters());
   __ CallStub(stub);
 }
@@ -152,17 +192,25 @@ void VirtualFrame::CallStub(CodeStub* stub, Result* arg0, Result* arg1) {
 
 
 void VirtualFrame::CallRuntime(Runtime::Function* f, int arg_count) {
-  PrepareForCall(arg_count, arg_count);
+  Forget(arg_count);
   ASSERT(cgen()->HasValidEntryRegisters());
   __ CallRuntime(f, arg_count);
 }
 
 
 void VirtualFrame::CallRuntime(Runtime::FunctionId id, int arg_count) {
-  PrepareForCall(arg_count, arg_count);
+  Forget(arg_count);
   ASSERT(cgen()->HasValidEntryRegisters());
   __ CallRuntime(id, arg_count);
 }
+
+
+#ifdef ENABLE_DEBUGGER_SUPPORT
+void VirtualFrame::DebugBreak() {
+  ASSERT(cgen()->HasValidEntryRegisters());
+  __ DebugBreak();
+}
+#endif
 
 
 void VirtualFrame::CallAlignedRuntime(Runtime::Function* f, int arg_count) {
@@ -195,6 +243,7 @@ void VirtualFrame::CallCodeObject(Handle<Code> code,
 
     case Code::FUNCTION:
       UNIMPLEMENTED_MIPS();
+      __ break_(__LINE__);
       break;
 
     case Code::KEYED_LOAD_IC:
@@ -215,8 +264,8 @@ void VirtualFrame::CallCodeObject(Handle<Code> code,
       // This is a builtin and it expects argument slots.
       // Don't protect the branch delay slot and use it to allocate args slots.
       __ Call(false, code, rmode);
-      __ addiu(sp, sp, -StandardFrameConstants::kRArgsSlotsSize);
-      __ addiu(sp, sp, StandardFrameConstants::kRArgsSlotsSize);
+      __ addiu(sp, sp, -StandardFrameConstants::kBArgsSlotsSize);
+      __ addiu(sp, sp, StandardFrameConstants::kBArgsSlotsSize);
       break;
 
     default:

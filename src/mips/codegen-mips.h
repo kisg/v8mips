@@ -279,6 +279,11 @@ class CodeGenerator: public AstVisitor {
 
   MemOperand SlotOperand(Slot* slot, Register tmp);
 
+  MemOperand ContextSlotOperandCheckExtensions(Slot* slot,
+                                               Register tmp,
+                                               Register tmp2,
+                                               JumpTarget* slow);
+
   // Expressions
   MemOperand GlobalObject() const  {
     return ContextOperand(cp, Context::GLOBAL_INDEX);
@@ -290,6 +295,7 @@ class CodeGenerator: public AstVisitor {
                      bool force_cc);
   void Load(Expression* x);
   void LoadGlobal();
+  void LoadGlobalReceiver(Register scratch);
 
   // Generate code to push the value of an expression on top of the frame
   // and then spill the frame fully to memory.  This function is used
@@ -314,8 +320,17 @@ class CodeGenerator: public AstVisitor {
 
   // Read a value from a slot and leave it on top of the expression stack.
   void LoadFromSlot(Slot* slot, TypeofState typeof_state);
+  void LoadFromGlobalSlotCheckExtensions(Slot* slot,
+                                         TypeofState typeof_state,
+                                         Register tmp,
+                                         Register tmp2,
+                                         JumpTarget* slow);
+
   // Store the value on top of the stack to a slot.
   void StoreToSlot(Slot* slot, InitState init_state);
+  // Load a keyed property, leaving it in v0. The receiver and key are
+  // passed on the stack, and remain there.
+  void EmitKeyedLoad(bool is_global);
 
   void ToBoolean(JumpTarget* true_target, JumpTarget* false_target);
 
@@ -332,6 +347,10 @@ class CodeGenerator: public AstVisitor {
                   Expression* left,
                   Expression* right,
                   bool strict = false);
+
+  void CallWithArguments(ZoneList<Expression*>* arguments,
+                         CallFunctionFlags flags,
+                         int position);
 
   // Control flow
   void Branch(bool if_true, JumpTarget* target);
@@ -629,6 +648,40 @@ class StringAddStub: public StringStubBase {
 };
 
 
+class SubStringStub: public StringStubBase {
+ public:
+  SubStringStub() {}
+
+ private:
+  Major MajorKey() { return SubString; }
+  int MinorKey() { return 0; }
+
+  void Generate(MacroAssembler* masm);
+};
+
+
+class StringCompareStub: public CodeStub {
+ public:
+  StringCompareStub() { }
+
+  // Compare two flat ASCII strings and returns result in v0.
+  // Does not use the stack.
+  static void GenerateCompareFlatAsciiStrings(MacroAssembler* masm,
+                                              Register left,
+                                              Register right,
+                                              Register scratch1,
+                                              Register scratch2,
+                                              Register scratch3,
+                                              Register scratch4);
+
+ private:
+  Major MajorKey() { return StringCompare; }
+  int MinorKey() { return 0; }
+
+  void Generate(MacroAssembler* masm);
+};
+
+
 // This stub can convert a signed int32 to a heap number (double).  It does
 // not work for int32s that are in Smi range!  No GC occurs during this stub
 // so you don't have to set up the frame.
@@ -668,6 +721,39 @@ class WriteInt32ToHeapNumberStub : public CodeStub {
 
 #ifdef DEBUG
   void Print() { PrintF("WriteInt32ToHeapNumberStub\n"); }
+#endif
+};
+
+
+class NumberToStringStub: public CodeStub {
+ public:
+  NumberToStringStub() { }
+
+  // Generate code to do a lookup in the number string cache. If the number in
+  // the register object is found in the cache the generated code falls through
+  // with the result in the result register. The object and the result register
+  // can be the same. If the number is not found in the cache the code jumps to
+  // the label not_found with only the content of register object unchanged.
+  static void GenerateLookupNumberStringCache(MacroAssembler* masm,
+                                              Register object,
+                                              Register result,
+                                              Register scratch1,
+                                              Register scratch2,
+                                              bool object_is_smi,
+                                              Label* not_found);
+
+ private:
+  Major MajorKey() { return NumberToString; }
+  int MinorKey() { return 0; }
+
+  void Generate(MacroAssembler* masm);
+
+  const char* GetName() { return "NumberToStringStub"; }
+
+#ifdef DEBUG
+  void Print() {
+    PrintF("NumberToStringStub\n");
+  }
 #endif
 };
 

@@ -70,6 +70,8 @@ class Debugger {
 
   void Stop(Instruction* instr);
   void Debug();
+  // Print all registers with a nice formatting.
+  void PrintAllRegs();
 
  private:
   // We set the breakpoint code to 0xfffff to easily recognize it.
@@ -89,9 +91,6 @@ class Debugger {
   // execution to skip past breakpoints when run from the debugger.
   void UndoBreakpoints();
   void RedoBreakpoints();
-
-  // Print all registers with a nice formatting.
-  void PrintAllRegs();
 };
 
 Debugger::Debugger(Simulator* sim) {
@@ -251,6 +250,7 @@ void Debugger::Debug() {
   char cmd[COMMAND_SIZE + 1];
   char arg1[ARG_SIZE + 1];
   char arg2[ARG_SIZE + 1];
+  char* argv[3] = { cmd, arg1, arg2 };
 
   // make sure to have a proper terminating character if reaching the limit
   cmd[COMMAND_SIZE] = 0;
@@ -278,15 +278,17 @@ void Debugger::Debug() {
     } else {
       // Use sscanf to parse the individual parts of the command line. At the
       // moment no command expects more than two parameters.
-      int args = SScanF(line,
+      int argc = SScanF(line,
                         "%" XSTR(COMMAND_SIZE) "s "
                         "%" XSTR(ARG_SIZE) "s "
                         "%" XSTR(ARG_SIZE) "s",
                         cmd, arg1, arg2);
       if ((strcmp(cmd, "si") == 0) || (strcmp(cmd, "stepi") == 0)) {
-        if (!(reinterpret_cast<Instruction*>(sim_->get_pc())->IsTrap())) {
+        Instruction* instr = reinterpret_cast<Instruction*>(sim_->get_pc());
+        if (!(instr->IsTrap()) ||
+            instr->InstructionBits() == rtCallRedirInstr) {
           sim_->InstructionDecode(
-                                reinterpret_cast<Instruction*>(sim_->get_pc()));
+              reinterpret_cast<Instruction*>(sim_->get_pc()));
         } else {
           // Allow si to jump over generated breakpoints.
           PrintF("/!\\ Jumping over generated breakpoint.\n");
@@ -298,7 +300,7 @@ void Debugger::Debug() {
         // Leave the debugger shell.
         done = true;
       } else if ((strcmp(cmd, "p") == 0) || (strcmp(cmd, "print") == 0)) {
-        if (args == 2) {
+        if (argc == 2) {
           int32_t value;
           if (strcmp(arg1, "all") == 0) {
             PrintAllRegs();
@@ -314,7 +316,7 @@ void Debugger::Debug() {
         }
       } else if ((strcmp(cmd, "po") == 0)
                  || (strcmp(cmd, "printobject") == 0)) {
-        if (args == 2) {
+        if (argc == 2) {
           int32_t value;
           if (GetValue(arg1, &value)) {
             Object* obj = reinterpret_cast<Object*>(value);
@@ -331,6 +333,38 @@ void Debugger::Debug() {
         } else {
           PrintF("printobject <value>\n");
         }
+      } else if (strcmp(cmd, "stack") == 0 || strcmp(cmd, "mem") == 0) {
+        int32_t* cur = NULL;
+        int32_t* end = NULL;
+        int next_arg = 1;
+
+        if (strcmp(cmd, "stack") == 0) {
+          cur = reinterpret_cast<int32_t*>(sim_->get_register(Simulator::sp));
+        } else {  // "mem"
+          int32_t value;
+          if (!GetValue(arg1, &value)) {
+            PrintF("%s unrecognized\n", arg1);
+            continue;
+          }
+          cur = reinterpret_cast<int32_t*>(value);
+          next_arg++;
+        }
+
+        int32_t words;
+        if (argc == next_arg) {
+          words = 10;
+        } else if (argc == next_arg + 1) {
+          if (!GetValue(argv[next_arg], &words)) {
+            words = 10;
+          }
+        }
+        end = cur + words;
+
+        while (cur < end) {
+          PrintF("  0x%08x:  0x%08x %10d\n", cur, *cur, *cur);
+          cur++;
+        }
+
       } else if ((strcmp(cmd, "disasm") == 0) || (strcmp(cmd, "dpc") == 0)) {
         disasm::NameConverter converter;
         disasm::Disassembler dasm(converter);
@@ -340,10 +374,10 @@ void Debugger::Debug() {
         byte_* cur = NULL;
         byte_* end = NULL;
 
-        if (args == 1) {
+        if (argc == 1) {
           cur = reinterpret_cast<byte_*>(sim_->get_pc());
           end = cur + (10 * Instruction::kInstructionSize);
-        } else if (args == 2) {
+        } else if (argc == 2) {
           int32_t value;
           if (GetValue(arg1, &value)) {
             cur = reinterpret_cast<byte_*>(value);
@@ -369,7 +403,7 @@ void Debugger::Debug() {
         v8::internal::OS::DebugBreak();
         PrintF("regaining control from gdb\n");
       } else if (strcmp(cmd, "break") == 0) {
-        if (args == 2) {
+        if (argc == 2) {
           int32_t value;
           if (GetValue(arg1, &value)) {
             if (!SetBreakpoint(reinterpret_cast<Instruction*>(value))) {
@@ -402,10 +436,10 @@ void Debugger::Debug() {
         byte_* cur = NULL;
         byte_* end = NULL;
 
-        if (args == 1) {
+        if (argc == 1) {
           cur = reinterpret_cast<byte_*>(sim_->get_pc());
           end = cur + (10 * Instruction::kInstructionSize);
-        } else if (args == 2) {
+        } else if (argc == 2) {
           int32_t value;
           if (GetValue(arg1, &value)) {
             cur = reinterpret_cast<byte_*>(value);
@@ -436,6 +470,10 @@ void Debugger::Debug() {
         PrintF("  use register name 'all' to print all registers\n");
         PrintF("printobject <register>\n");
         PrintF("  print an object from a register (alias 'po')\n");
+        PrintF("stack [<words>]\n");
+        PrintF("  dump stack content, default dump 10 words)\n");
+        PrintF("mem <address> [<words>]\n");
+        PrintF("  dump memory content, default dump 10 words)\n");
         PrintF("flags\n");
         PrintF("  print flags\n");
         PrintF("disasm [<instructions>]\n");
@@ -492,6 +530,7 @@ Simulator::Simulator() {
   stack_ = reinterpret_cast<char*>(malloc(stack_size));
   pc_modified_ = false;
   icount_ = 0;
+  break_count_ = 0;
   break_pc_ = NULL;
   break_instr_ = 0;
 
@@ -500,6 +539,10 @@ Simulator::Simulator() {
   for (int i = 0; i < kNumSimuRegisters; i++) {
     registers_[i] = 0;
   }
+  for (int i = 0; i < kNumFPURegisters; i++) {
+    FPUregisters_[i] = 0;
+  }
+  FPUccr_ = 0;
 
   // The sp is initialized to point to the bottom (high address) of the
   // allocated stack area. To be safe in potential stack underflows we leave
@@ -602,6 +645,11 @@ void Simulator::set_fpu_register(int fpureg, int32_t value) {
   FPUregisters_[fpureg] = value;
 }
 
+void Simulator::set_fpu_register_float(int fpureg, float value) {
+  ASSERT((fpureg >= 0) && (fpureg < kNumFPURegisters));
+  *v8i::BitCast<float*, int32_t*>(&FPUregisters_[fpureg]) = value;
+}
+
 void Simulator::set_fpu_register_double(int fpureg, double value) {
   ASSERT((fpureg >= 0) && (fpureg < kNumFPURegisters) && ((fpureg % 2) == 0));
   *v8i::BitCast<double*, int32_t*>(&FPUregisters_[fpureg]) = value;
@@ -623,11 +671,33 @@ int32_t Simulator::get_fpu_register(int fpureg) const {
   return FPUregisters_[fpureg];
 }
 
+float Simulator::get_fpu_register_float(int fpureg) const {
+  ASSERT((fpureg >= 0) && (fpureg < kNumFPURegisters));
+  return *v8i::BitCast<float*, int32_t*>(
+      const_cast<int32_t*>(&FPUregisters_[fpureg]));
+}
+
 double Simulator::get_fpu_register_double(int fpureg) const {
   ASSERT((fpureg >= 0) && (fpureg < kNumFPURegisters) && ((fpureg % 2) == 0));
   return *v8i::BitCast<double*, int32_t*>(
       const_cast<int32_t*>(&FPUregisters_[fpureg]));
 }
+
+// Helper functions for setting and testing the FPU condition code bits.
+void Simulator::set_fpu_ccr_bit(uint32_t cc, bool value) {
+  ASSERT(is_uint3(cc));
+  if (value) {
+    FPUccr_ |= (1 << cc);
+  } else {
+    FPUccr_ &= ~(1 << cc);
+  }
+}
+
+bool Simulator::test_fpu_ccr_bit(uint32_t cc) {
+  ASSERT(is_uint3(cc));
+  return FPUccr_ & (1 << cc);
+}
+
 
 // Raw access to the PC register.
 void Simulator::set_pc(int32_t value) {
@@ -650,6 +720,11 @@ int32_t Simulator::get_pc() const {
 // get the correct MIPS-like behaviour on unaligned accesses.
 
 int Simulator::ReadW(int32_t addr, Instruction* instr) {
+  if (addr >= 0 && addr < 0x400) {
+    // this has to be a NULL-dereference
+    Debugger dbg(this);
+    dbg.Debug();
+  }
   if ((addr & v8i::kPointerAlignmentMask) == 0) {
     intptr_t* ptr = reinterpret_cast<intptr_t*>(addr);
     return *ptr;
@@ -661,6 +736,11 @@ int Simulator::ReadW(int32_t addr, Instruction* instr) {
 
 
 void Simulator::WriteW(int32_t addr, int value, Instruction* instr) {
+  if (addr >= 0 && addr < 0x400) {
+    // this has to be a NULL-dereference
+    Debugger dbg(this);
+    dbg.Debug();
+  }
   if ((addr & v8i::kPointerAlignmentMask) == 0) {
     intptr_t* ptr = reinterpret_cast<intptr_t*>(addr);
     *ptr = value;
@@ -793,8 +873,14 @@ typedef double (*SimulatorRuntimeFPCall)(int32_t arg0,
                                         int32_t arg3);
 
 // Software interrupt instructions are used by the simulator to call into the
-// C-based V8 runtime.
+// C-based V8 runtime. They are also used for debugging with simulator.
 void Simulator::SoftwareInterrupt(Instruction* instr) {
+  // There are several instructions that could get us here,
+  // the break_ instruction, or several variants of traps. All
+  // Are "SPECIAL" class opcode, and are distinuished by function.
+  int32_t func = instr->FunctionFieldRaw();
+  int32_t code = (func == BREAK) ? instr->Bits(25, 6) : -1;
+
   // We first check if we met a call_rt_redirected.
   if (instr->InstructionBits() == rtCallRedirInstr) {
     Redirection* redirection = Redirection::FromSwiInstruction(instr);
@@ -852,7 +938,17 @@ void Simulator::SoftwareInterrupt(Instruction* instr) {
     }
     set_register(ra, saved_ra);
     set_pc(get_register(ra));
+
+  } else if (func == BREAK && code >= 0 && code < 16) {
+    // First 16 break_ codes interpreted as debug markers.
+    Debugger dbg(this);
+    ++break_count_;
+    PrintF("\n---- break %d marker: %3d  (instr count: %8d) ----------"
+           "----------------------------------",
+           code, break_count_, icount_);
+    dbg.PrintAllRegs();  // Print registers and continue running.
   } else {
+    // All remaining break_ codes, and all traps are handled here.
     Debugger dbg(this);
     dbg.Debug();
   }
@@ -868,7 +964,7 @@ void Simulator::SignalExceptions() {
 
 // Handle execution based on instruction types.
 void Simulator::DecodeTypeRegister(Instruction* instr) {
-  // Instruction fields
+  // Instruction fields.
   Opcode   op     = instr->OpcodeFieldRaw();
   int32_t  rs_reg = instr->RsField();
   int32_t  rs     = get_register(rs_reg);
@@ -886,8 +982,8 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
   uint64_t u64hilo = 0;
 
   // ALU output
-  // It should not be used as is. Instructions using it should always initialize
-  // it first.
+  // It should not be used as is. Instructions using it should always
+  // initialize it first.
   int32_t alu_out = 0x12345678;
 
   // For break and trap instructions.
@@ -903,7 +999,7 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
   switch (op) {
     case COP1:    // Coprocessor instructions
       switch (instr->RsFieldRaw()) {
-        case BC1:   // branch on coprocessor condition
+        case BC1:   // Handled in DecodeTypeImmed, should never come here.
           UNREACHABLE();
           break;
         case MFC1:
@@ -937,7 +1033,16 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
           alu_out = rt << sa;
           break;
         case SRL:
-          alu_out = rt_u >> sa;
+          if (rs_reg == 0) {
+            // Regular logical right shift of a word by a fixed number of
+            // bits instruction. RS field is always equal to 0.
+            alu_out = rt_u >> sa;
+          } else {
+            // Logical right-rotate of a word by a fixed number of bits. This
+            // is special case od SRL instruction, added in MIPS32 Release 2.
+            // RS field is equal to 00001
+            alu_out = (rt_u >> sa) | (rt_u << (32 - sa));
+          }
           break;
         case SRA:
           alu_out = rt >> sa;
@@ -946,7 +1051,16 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
           alu_out = rt << rs;
           break;
         case SRLV:
-          alu_out = rt_u >> rs;
+          if (sa == 0) {
+            // Regular logical right-shift of a word by a variable number of
+            // bits instruction. SA field is always equal to 0.
+            alu_out = rt_u >> rs;
+          } else {
+            // Logical right-rotate of a word by a variable number of bits.
+            // This is special case od SRLV instruction, added in MIPS32
+            // Release 2. SA field is equal to 00001
+            alu_out = (rt_u >> rs_u) | (rt_u << (32 - rs_u));
+          }
           break;
         case SRAV:
           alu_out = rt >> rs;
@@ -1013,6 +1127,7 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
           break;
         // Break and trap instructions
         case BREAK:
+
           do_interrupt = true;
           break;
         case TGE:
@@ -1106,8 +1221,12 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
           UNIMPLEMENTED_MIPS();
           break;
         case S:
+          float f;
           switch (instr->FunctionFieldRaw()) {
             case CVT_D_S:
+              f = get_fpu_register_float(fs_reg);
+              set_fpu_register_double(fd_reg, static_cast<double>(f));
+              break;
             case CVT_W_S:
             case CVT_L_S:
             case CVT_PS_S:
@@ -1119,22 +1238,22 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
           break;
         case D:
           double ft, fs;
+          uint32_t cc;
+          int64_t  i64;
           fs = get_fpu_register_double(fs_reg);
+          ft = get_fpu_register_double(ft_reg);
+          cc = instr->FCccField();
           switch (instr->FunctionFieldRaw()) {
             case ADD_D:
-              ft = get_fpu_register_double(ft_reg);
               set_fpu_register_double(fd_reg, fs + ft);
               break;
             case SUB_D:
-              ft = get_fpu_register_double(ft_reg);
               set_fpu_register_double(fd_reg, fs - ft);
               break;
             case MUL_D:
-              ft = get_fpu_register_double(ft_reg);
               set_fpu_register_double(fd_reg, fs * ft);
               break;
             case DIV_D:
-              ft = get_fpu_register_double(ft_reg);
               set_fpu_register_double(fd_reg, fs / ft);
               break;
             case ABS_D:
@@ -1146,11 +1265,39 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
             case NEG_D:
               set_fpu_register_double(fd_reg, -fs);
               break;
-            case CVT_W_D:   // Convert double to word
+            case CVT_W_D:   // Convert double to word.
               set_fpu_register(fd_reg, static_cast<int32_t>(fs));
               break;
-            case CVT_S_D:
+            case C_UN_D:
+              set_fpu_ccr_bit(cc, isnan(fs) || isnan(ft));
+              break;
+            case C_EQ_D:
+              set_fpu_ccr_bit(cc, (fs == ft));
+              break;
+            case C_UEQ_D:
+              set_fpu_ccr_bit(cc, (fs == ft) || (isnan(fs) || isnan(ft)));
+              break;
+            case C_OLT_D:
+              set_fpu_ccr_bit(cc, (fs < ft));
+              break;
+            case C_ULT_D:
+              set_fpu_ccr_bit(cc, (fs < ft) || (isnan(fs) || isnan(ft)));
+              break;
+            case C_OLE_D:
+              set_fpu_ccr_bit(cc, (fs <= ft));
+              break;
+            case C_ULE_D:
+              set_fpu_ccr_bit(cc, (fs <= ft) || (isnan(fs) || isnan(ft)));
+              break;
+            case CVT_S_D:  // Convert double to float (single).
+              set_fpu_register_float(fd_reg, static_cast<float>(fs));
+              break;
             case CVT_L_D:
+              i64 = static_cast<int64_t>(fs);
+              set_fpu_register(fd_reg, i64 & 0xffffffff);
+              set_fpu_register(fd_reg + 1, i64 >> 32);
+              break;
+            case C_F_D:
               UNIMPLEMENTED_MIPS();
               break;
             default:
@@ -1159,8 +1306,9 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
           break;
         case W:
           switch (instr->FunctionFieldRaw()) {
-            case CVT_S_W:
-              UNIMPLEMENTED_MIPS();
+            case CVT_S_W:   // Convert word to float (single).
+              alu_out = get_fpu_register(fs_reg);
+              set_fpu_register_float(fd_reg, static_cast<float>(alu_out));
               break;
             case CVT_D_W:   // Convert word to double.
               alu_out = get_fpu_register(fs_reg);
@@ -1172,8 +1320,13 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
           break;
         case L:
           switch (instr->FunctionFieldRaw()) {
-            case CVT_S_L:
             case CVT_D_L:
+              // Watch the signs here, we want 2 32-bit vals to make a sign-64.
+              i64 = (uint32_t) get_fpu_register(fs_reg);
+              i64 |= ((int64_t) get_fpu_register(fs_reg + 1) << 32);
+              set_fpu_register_double(fd_reg, static_cast<double>(i64));
+              break;
+            case CVT_S_L:
               UNIMPLEMENTED_MIPS();
               break;
             default:
@@ -1282,7 +1435,7 @@ void Simulator::DecodeTypeRegister(Instruction* instr) {
 
 // Type 2: instructions using a 16 bytes immediate. (eg: addi, beq)
 void Simulator::DecodeTypeImmediate(Instruction* instr) {
-  // Instruction fields
+  // Instruction fields.
   Opcode   op     = instr->OpcodeFieldRaw();
   int32_t  rs     = get_register(instr->RsField());
   uint32_t rs_u   = static_cast<uint32_t>(rs);
@@ -1292,9 +1445,9 @@ void Simulator::DecodeTypeImmediate(Instruction* instr) {
 
   int32_t  ft_reg = instr->FtField();  // destination register
 
-  // zero extended immediate
+  // Zero extended immediate.
   uint32_t  oe_imm16 = 0xffff & imm16;
-  // sign extended immediate
+  // Sign extended immediate.
   int32_t   se_imm16 = imm16;
 
   // Get current pc.
@@ -1302,25 +1455,35 @@ void Simulator::DecodeTypeImmediate(Instruction* instr) {
   // Next pc.
   int32_t next_pc = bad_ra;
 
-  // Used for conditional branch instructions
+  // Used for conditional branch instructions.
   bool do_branch = false;
   bool execute_branch_delay_instruction = false;
 
-  // Used for arithmetic instructions
+  // Used for arithmetic instructions.
   int32_t alu_out = 0;
-  // Floating point
+  // Floating point.
   double fp_out = 0.0;
+  uint32_t cc, cc_value;
 
-  // Used for memory instructions
+  // Used for memory instructions.
   int32_t addr = 0x0;
 
   // ---------- Configuration (and execution for REGIMM)
   switch (op) {
-    // ------------- COP1. Coprocessor instructions
+    // ------------- COP1. Coprocessor instructions.
     case COP1:
       switch (instr->RsFieldRaw()) {
-        case BC1:   // branch on coprocessor condition
-          UNIMPLEMENTED_MIPS();
+        case BC1:   // Branch on coprocessor condition.
+          cc = instr->FBccField();
+          cc_value = test_fpu_ccr_bit(cc);
+          do_branch = (instr->FBtrueField()) ? cc_value : !cc_value;
+          execute_branch_delay_instruction = true;
+          // Set next_pc
+          if (do_branch) {
+            next_pc = current_pc + (imm16 << 2) + Instruction::kInstructionSize;
+          } else {
+            next_pc = current_pc + kBranchReturnOffset;
+          }
           break;
         default:
           UNREACHABLE();
@@ -1648,7 +1811,7 @@ int32_t Simulator::Call(byte_* entry, int argument_count, ...) {
   int original_stack = get_register(sp);
   // Compute position of stack on entry to generated code.
   int entry_stack = (original_stack - (argument_count - 4) * sizeof(int32_t)
-                                    - kArgsSlotsSize);
+                                    - kCArgsSlotsSize);
   if (OS::ActivationFrameAlignment() != 0) {
     entry_stack &= -OS::ActivationFrameAlignment();
   }

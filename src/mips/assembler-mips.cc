@@ -688,28 +688,13 @@ void Assembler::jalr(Register rs, Register rd) {
 
 // Arithmetic.
 
-void Assembler::add(Register rd, Register rs, Register rt) {
-  GenInstrRegister(SPECIAL, rs, rt, rd, 0, ADD);
-}
-
-
 void Assembler::addu(Register rd, Register rs, Register rt) {
   GenInstrRegister(SPECIAL, rs, rt, rd, 0, ADDU);
 }
 
 
-void Assembler::addi(Register rd, Register rs, int32_t j) {
-  GenInstrImmediate(ADDI, rs, rd, j);
-}
-
-
 void Assembler::addiu(Register rd, Register rs, int32_t j) {
   GenInstrImmediate(ADDIU, rs, rd, j);
-}
-
-
-void Assembler::sub(Register rd, Register rs, Register rt) {
-  GenInstrRegister(SPECIAL, rs, rt, rd, 0, SUB);
 }
 
 
@@ -810,6 +795,19 @@ void Assembler::srav(Register rd, Register rt, Register rs) {
   GenInstrRegister(SPECIAL, rs, rt, rd, 0, SRAV);
 }
 
+void Assembler::rotr(Register rd, Register rt, uint16_t sa) {
+  ASSERT(rd.is_valid() && rt.is_valid() && is_uint5(sa));
+  Instr instr = SPECIAL | (1 << kRsShift) | (rt.code() << kRtShift)
+      | (rd.code() << kRdShift) | (sa << kSaShift) | SRL;
+  emit(instr);
+}
+
+void Assembler::rotrv(Register rd, Register rt, Register rs) {
+  ASSERT(rd.is_valid() && rt.is_valid() && rs.is_valid() );
+  Instr instr = SPECIAL | (rs.code() << kRsShift) | (rt.code() << kRtShift)
+      | (rd.code() << kRdShift) | (1 << kSaShift) | SRLV;
+  emit(instr);
+}
 
 //------------Memory-instructions-------------
 
@@ -1109,7 +1107,7 @@ void Assembler::cvt_d_s(FPURegister fd, FPURegister fs) {
 
 // Conditions.
 void Assembler::c(FPUCondition cond, SecondaryField fmt,
-    FPURegister ft, FPURegister fs, uint16_t cc) {
+    FPURegister fs, FPURegister ft, uint16_t cc) {
   ASSERT(is_uint3(cc));
   ASSERT((fmt & ~(31 << kRsShift)) == 0);
   Instr instr = COP1 | fmt | ft.code() << 16 | fs.code() << kFsShift

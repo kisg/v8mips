@@ -41,6 +41,12 @@ namespace internal {
 
 #define __ ACCESS_MASM(cgen()->masm())
 
+// BRANCH_ARGS_CHECK checks that conditional jump arguments are correct.
+#define BRANCH_ARGS_CHECK(cond, rs, rt) ASSERT(                                \
+    (cond == cc_always && rs.is(zero_reg) && rt.rm().is(zero_reg)) ||          \
+    (cond != cc_always && (!rs.is(zero_reg) || !rt.rm().is(zero_reg))))
+
+
 void JumpTarget::DoJump() {
   ASSERT(cgen()->has_valid_frame());
   // Live non-frame registers are not allowed at unconditional jumps
@@ -78,6 +84,7 @@ void JumpTarget::DoJump() {
 
 void JumpTarget::DoBranch(Condition cc, Hint ignored,
     Register src1, const Operand& src2) {
+  BRANCH_ARGS_CHECK(cc, src1, src2);
   ASSERT(cgen()->has_valid_frame());
 
   if (is_bound()) {
@@ -98,12 +105,35 @@ void JumpTarget::DoBranch(Condition cc, Hint ignored,
       ASSERT(is_linked());
     }
   }
-  __ Branch(cc, &entry_label_, src1, src2);
+  __ Branch(&entry_label_, cc, src1, src2);
 }
 
 
 void JumpTarget::Call() {
-  UNIMPLEMENTED_MIPS();
+  // Call is used to push the address of the catch block on the stack as
+  // a return address when compiling try/catch and try/finally.  We
+  // fully spill the frame before making the call.  The expected frame
+  // at the label (which should be the only one) is the spilled current
+  // frame plus an in-memory return address.  The "fall-through" frame
+  // at the return site is the spilled current frame.
+  ASSERT(cgen()->has_valid_frame());
+  // There are no non-frame references across the call.
+  ASSERT(cgen()->HasValidEntryRegisters());
+  ASSERT(!is_linked());
+
+  // Calls are always 'forward' so we use a copy of the current frame (plus
+  // one for a return address) as the expected frame.
+  ASSERT(entry_frame_ == NULL);
+  VirtualFrame* target_frame = new VirtualFrame(cgen()->frame());
+  target_frame->Adjust(1);
+  entry_frame_ = target_frame;
+
+  // The predicate is_linked() should now be made true.  Its implementation
+  // detects the presence of a frame pointer in the reaching_frames_ list.
+  reaching_frames_.Add(NULL);
+  ASSERT(is_linked());
+
+  __ Call(&entry_label_);
 }
 
 
@@ -129,9 +159,9 @@ void JumpTarget::DoBind() {
     cgen()->SetFrame(new VirtualFrame(entry_frame_), &empty);
   }
 
-  // The predicate is_linked() should be made false.  Its implementation
+  // The predicate is_linked() should be made false. Its implementation
   // detects the presence (or absence) of frame pointers in the
-  // reaching_frames_ list.  If we inserted a bogus frame to make
+  // reaching_frames_ list. If we inserted a bogus frame to make
   // is_linked() true, remove it now.
   if (is_linked()) {
     reaching_frames_.Clear();
@@ -187,6 +217,7 @@ void BreakTarget::Bind(Result* arg) {
 
 
 #undef __
+#undef BRANCH_ARGS_CHECK
 
 
 } }  // namespace v8::internal

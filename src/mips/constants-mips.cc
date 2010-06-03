@@ -190,9 +190,14 @@ bool Instruction::IsLinkingInstruction() {
   int op = OpcodeFieldRaw();
   switch (op) {
     case JAL:
-    case BGEZAL:
-    case BLTZAL:
-      return true;
+    case REGIMM:
+      switch (RtFieldRaw()) {
+        case BGEZAL:
+        case BLTZAL:
+          return true;
+      default:
+        return false;
+      };
     case SPECIAL:
       switch (FunctionFieldRaw()) {
         case JALR:
@@ -287,7 +292,7 @@ Instruction::Type Instruction::InstructionType() const {
       };
       break;
     case COP1:    // Coprocessor instructions
-      switch (FunctionFieldRaw()) {
+      switch (RsFieldRawNoAssert()) {
         case BC1:   // branch on coprocessor condition
           return kImmediateType;
         default:

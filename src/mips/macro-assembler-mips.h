@@ -65,146 +65,86 @@ class MacroAssembler: public Assembler {
  public:
   MacroAssembler(void* buffer, int size);
 
-  // Jump, Call, and Ret pseudo instructions implementing inter-working.
-  // By default branch delay slot are protected with an inserted nop.
-  void Jump(const Operand& target,
-            Condition cond = cc_always,
-            Register r1 = zero_reg, const Operand& r2 = Operand(zero_reg),
-            bool ProtectBranchDelaySlot = true);
-  void Call(const Operand& target,
-            Condition cond = cc_always,
-            Register r1 = zero_reg, const Operand& r2 = Operand(zero_reg),
-            bool ProtectBranchDelaySlot = true);
-  void Jump(Register target,
-            Condition cond = cc_always,
-            Register r1 = zero_reg, const Operand& r2 = Operand(zero_reg),
-            bool ProtectBranchDelaySlot = true);
-  void Jump(byte* target, RelocInfo::Mode rmode,
-            Condition cond = cc_always,
-            Register r1 = zero_reg, const Operand& r2 = Operand(zero_reg),
-            bool ProtectBranchDelaySlot = true);
-  void Jump(Handle<Code> code, RelocInfo::Mode rmode,
-            Condition cond = cc_always,
-            Register r1 = zero_reg, const Operand& r2 = Operand(zero_reg),
-            bool ProtectBranchDelaySlot = true);
-  void Call(Register target,
-            Condition cond = cc_always,
-            Register r1 = zero_reg, const Operand& r2 = Operand(zero_reg),
-            bool ProtectBranchDelaySlot = true);
-  void Call(byte* target, RelocInfo::Mode rmode,
-            Condition cond = cc_always,
-            Register r1 = zero_reg, const Operand& r2 = Operand(zero_reg),
-            bool ProtectBranchDelaySlot = true);
-  void Call(Handle<Code> code, RelocInfo::Mode rmode,
-            Condition cond = cc_always,
-            Register r1 = zero_reg, const Operand& r2 = Operand(zero_reg),
-            bool ProtectBranchDelaySlot = true);
-  void Ret(Condition cond = cc_always,
-           Register r1 = zero_reg, const Operand& r2 = Operand(zero_reg),
-           bool ProtectBranchDelaySlot = true);
-  void Branch(Condition cond, int16_t offset, Register rs = zero_reg,
-              const Operand& rt = Operand(zero_reg), Register scratch = at,
-              bool ProtectBranchDelaySlot = true);
-  void Branch(Condition cond, Label* L, Register rs = zero_reg,
-              const Operand& rt = Operand(zero_reg), Register scratch = at,
-              bool ProtectBranchDelaySlot = true);
-  // conditionnal branch and link
-  void BranchAndLink(Condition cond, int16_t offset, Register rs = zero_reg,
-                     const Operand& rt = Operand(zero_reg),
-                     Register scratch = at, bool ProtectBranchDelaySlot = true);
-  void BranchAndLink(Condition cond, Label* L, Register rs = zero_reg,
-                     const Operand& rt = Operand(zero_reg),
-                     Register scratch = at, bool ProtectBranchDelaySlot = true);
+// Arguments macros
+#define COND_TYPED_ARGS Condition cond, Register r1, const Operand& r2
+#define COND_ARGS cond, r1, r2
 
-  // Convenient template with the boolean as first argument.
-  inline void Jump(bool ProtectBranchDelaySlot,
-                   const Operand& target,
-                   Condition cond = cc_always,
-                   Register r1 = zero_reg,
-                   const Operand& r2 = Operand(zero_reg)) {
-  Jump(target, cond, r1, r2, ProtectBranchDelaySlot);
-}
-  inline void Call(bool ProtectBranchDelaySlot,
-                   const Operand& target,
-                   Condition cond = cc_always,
-                   Register r1 = zero_reg,
-                   const Operand& r2 = Operand(zero_reg)) {
-  Call(target, cond, r1, r2, ProtectBranchDelaySlot);
-}
-  inline void Jump(bool ProtectBranchDelaySlot,
-                   Register target,
-                   Condition cond = cc_always,
-                   Register r1 = zero_reg,
-                   const Operand& r2 = Operand(zero_reg)) {
-  Jump(target, cond, r1, r2, ProtectBranchDelaySlot);
-}
-  inline void Jump(bool ProtectBranchDelaySlot,
-                   byte* target, RelocInfo::Mode rmode,
-                   Condition cond = cc_always,
-                   Register r1 = zero_reg,
-                   const Operand& r2 = Operand(zero_reg)) {
-  Jump(target, rmode, cond, r1, r2, ProtectBranchDelaySlot);
-}
-  inline void Jump(bool ProtectBranchDelaySlot,
-                   Handle<Code> code, RelocInfo::Mode rmode,
-                   Condition cond = cc_always,
-                   Register r1 = zero_reg,
-                   const Operand& r2 = Operand(zero_reg)) {
-  Jump(code, rmode, cond, r1, r2, ProtectBranchDelaySlot);
-}
-  inline void Call(bool ProtectBranchDelaySlot,
-                   Register target,
-                   Condition cond = cc_always,
-                   Register r1 = zero_reg,
-                   const Operand& r2 = Operand(zero_reg)) {
-  Call(target, cond, r1, r2, ProtectBranchDelaySlot);
-}
-  inline void Call(bool ProtectBranchDelaySlot,
-                   byte* target, RelocInfo::Mode rmode,
-                   Condition cond = cc_always,
-                   Register r1 = zero_reg,
-                   const Operand& r2 = Operand(zero_reg)) {
-  Call(target, rmode, cond, r1, r2, ProtectBranchDelaySlot);
-}
-  inline void Call(bool ProtectBranchDelaySlot,
-                   Handle<Code> code, RelocInfo::Mode rmode,
-                   Condition cond = cc_always,
-                   Register r1 = zero_reg,
-                   const Operand& r2 = Operand(zero_reg)) {
-  Call(code, rmode, cond, r1, r2, ProtectBranchDelaySlot);
-}
-  inline void Ret(bool ProtectBranchDelaySlot,
-                  Condition cond = cc_always,
-                  Register r1 = zero_reg,
-                  const Operand& r2 = Operand(zero_reg)) {
-  Ret(cond, r1, r2, ProtectBranchDelaySlot);
-}
-  inline void Branch(bool ProtectBranchDelaySlot,
-                     Condition cond, int16_t offset, Register rs = zero_reg,
-                     const Operand& rt = Operand(zero_reg),
-                     Register scratch = at) {
-  Branch(cond, offset, rs, rt, scratch = at, ProtectBranchDelaySlot);
-}
-  inline void Branch(bool ProtectBranchDelaySlot,
-                     Condition cond, Label* L, Register rs = zero_reg,
-                     const Operand& rt = Operand(zero_reg),
-                     Register scratch = at) {
-  Branch(cond, L, rs, rt, scratch = at, ProtectBranchDelaySlot);
-}
-  // conditionnal branch and link
-  inline void BranchAndLink(bool ProtectBranchDelaySlot,
-                            Condition cond, int16_t offset,
-                            Register rs = zero_reg,
-                            const Operand& rt = Operand(zero_reg),
-                            Register scratch = at) {
-  BranchAndLink(cond, offset, rs, rt, at, ProtectBranchDelaySlot);
-}
-  inline void BranchAndLink(bool ProtectBranchDelaySlot,
-                            Condition cond, Label* L, Register rs = zero_reg,
-                            const Operand& rt = Operand(zero_reg),
-                            Register scratch = at) {
-  BranchAndLink(cond, L, rs, rt, at, ProtectBranchDelaySlot);
-}
+// ** Prototypes
+
+// * Prototypes for functions with no target (eg Ret()).
+#define DECLARE_NOTARGET_PROTOTYPE(Name) \
+  void Name(bool ProtectBranchDelaySlot = true); \
+  void Name(COND_TYPED_ARGS, bool ProtectBranchDelaySlot = true); \
+  inline void Name(bool ProtectBranchDelaySlot, COND_TYPED_ARGS) { \
+    Name(COND_ARGS, ProtectBranchDelaySlot); \
+  }
+
+// * Prototypes for functions with a target.
+
+// Cases when relocation may be needed.
+#define DECLARE_RELOC_PROTOTYPE(Name, target_type) \
+  void Name(target_type target, \
+            RelocInfo::Mode rmode, \
+            bool ProtectBranchDelaySlot = true); \
+  inline void Name(bool ProtectBranchDelaySlot, \
+                   target_type target, \
+                   RelocInfo::Mode rmode) { \
+    Name(target, rmode, ProtectBranchDelaySlot); \
+  } \
+  void Name(target_type target, \
+            RelocInfo::Mode rmode, \
+            COND_TYPED_ARGS, \
+            bool ProtectBranchDelaySlot = true); \
+  inline void Name(bool ProtectBranchDelaySlot, \
+                   target_type target, \
+                   RelocInfo::Mode rmode, \
+                   COND_TYPED_ARGS) { \
+    Name(target, rmode, COND_ARGS, ProtectBranchDelaySlot); \
+  }
+
+// Cases when relocation is not needed.
+#define DECLARE_NORELOC_PROTOTYPE(Name, target_type) \
+  void Name(target_type target, bool ProtectBranchDelaySlot = true); \
+  inline void Name(bool ProtectBranchDelaySlot, target_type target) { \
+    Name(target, ProtectBranchDelaySlot); \
+  } \
+  void Name(target_type target, \
+            COND_TYPED_ARGS, \
+            bool ProtectBranchDelaySlot = true); \
+  inline void Name(bool ProtectBranchDelaySlot, \
+                   target_type target, \
+                   COND_TYPED_ARGS) { \
+    Name(target, COND_ARGS, ProtectBranchDelaySlot); \
+  }
+
+// ** Target prototypes.
+
+#define DECLARE_JUMP_CALL_PROTOTYPES(Name) \
+  DECLARE_NORELOC_PROTOTYPE(Name, Register) \
+  DECLARE_NORELOC_PROTOTYPE(Name, const Operand&) \
+  DECLARE_RELOC_PROTOTYPE(Name, byte*) \
+  DECLARE_RELOC_PROTOTYPE(Name, Handle<Code>)
+
+#define DECLARE_BRANCH_PROTOTYPES(Name) \
+  DECLARE_NORELOC_PROTOTYPE(Name, Label*) \
+  DECLARE_NORELOC_PROTOTYPE(Name, int16_t)
+
+
+DECLARE_JUMP_CALL_PROTOTYPES(Jump)
+DECLARE_JUMP_CALL_PROTOTYPES(Call)
+
+DECLARE_BRANCH_PROTOTYPES(Branch)
+DECLARE_BRANCH_PROTOTYPES(BranchAndLink)
+
+DECLARE_NOTARGET_PROTOTYPE(Ret)
+
+#undef COND_TYPED_ARGS
+#undef COND_ARGS
+#undef DECLARE_NOTARGET_PROTOTYPE
+#undef DECLARE_NORELOC_PROTOTYPE
+#undef DECLARE_RELOC_PROTOTYPE
+#undef DECLARE_JUMP_CALL_PROTOTYPES
+#undef DECLARE_BRANCH_PROTOTYPES
 
   // Emit code to discard a non-negative number of pointer-sized elements
   // from the stack, clobbering only the sp register.
@@ -218,7 +158,7 @@ class MacroAssembler: public Assembler {
   // Currently the branch delay slot is filled by the MacroAssembler.
   // Use rather b(Label) for code generation.
   void jmp(Label* L) {
-    Branch(cc_always, L);
+    Branch(L);
   }
 
   // Load an object from the root table.
@@ -338,7 +278,6 @@ class MacroAssembler: public Assembler {
     instr(rs, Operand(j));                                                     \
   }
 
-  DEFINE_INSTRUCTION(Add);
   DEFINE_INSTRUCTION(Addu);
   DEFINE_INSTRUCTION(Subu);
   DEFINE_INSTRUCTION(Mul);
@@ -387,7 +326,7 @@ class MacroAssembler: public Assembler {
 
   void Push(Register src, Condition cond, Register tst1, Register tst2) {
     // Since we don't have conditionnal execution we use a Branch.
-    Branch(cond, 3, tst1, Operand(tst2));
+    Branch(3, cond, tst1, Operand(tst2));
     Addu(sp, sp, Operand(-kPointerSize));
     sw(src, MemOperand(sp, 0));
   }
@@ -401,11 +340,11 @@ class MacroAssembler: public Assembler {
     Addu(sp, sp, Operand(kPointerSize));
   }
   void Pop(uint32_t count = 1) {
-    Add(sp, sp, Operand(count * kPointerSize));
+    Addu(sp, sp, Operand(count * kPointerSize));
   }
 
 
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // Activation frames
 
   void EnterInternalFrame() { EnterFrame(StackFrame::INTERNAL); }
@@ -433,7 +372,7 @@ class MacroAssembler: public Assembler {
   void ReturnFromAlignedCall();
 
 
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // JavaScript invokes
 
   // Invoke the JavaScript function code by either calling or jumping.
@@ -454,9 +393,13 @@ class MacroAssembler: public Assembler {
                       const ParameterCount& actual,
                       InvokeFlag flag);
 
+  void InvokeFunction(JSFunction* function,
+                      const ParameterCount& actual,
+                      InvokeFlag flag);
+
 
 #ifdef ENABLE_DEBUGGER_SUPPORT
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // Debugger Support
 
   void SaveRegistersToMemory(RegList regs);
@@ -469,7 +412,7 @@ class MacroAssembler: public Assembler {
 #endif
 
 
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // Exception handling
 
   // Push a new try handler and link into try handler chain.
@@ -482,7 +425,7 @@ class MacroAssembler: public Assembler {
   void PopTryHandler();
 
 
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // Support functions.
 
   // Try to get function prototype of a function and puts the value in
@@ -503,7 +446,7 @@ class MacroAssembler: public Assembler {
                           Register scratch = at) {
     ASSERT_EQ(0, kSmiTag);
     andi(scratch, value, kSmiTagMask);
-    Branch(eq, smi_label, scratch, Operand(zero_reg));
+    Branch(smi_label, eq, scratch, Operand(zero_reg));
   }
 
 
@@ -511,7 +454,7 @@ class MacroAssembler: public Assembler {
                              Register scratch = at) {
     ASSERT_EQ(0, kSmiTag);
     andi(scratch, value, kSmiTagMask);
-    Branch(ne, not_smi_label, scratch, Operand(zero_reg));
+    Branch(not_smi_label, ne, scratch, Operand(zero_reg));
   }
 
   void CallBuiltin(ExternalReference builtin_entry);
@@ -526,7 +469,7 @@ class MacroAssembler: public Assembler {
   void IllegalOperation(int num_arguments);
 
 
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // Runtime calls
 
   // Call a code stub.
@@ -546,6 +489,10 @@ class MacroAssembler: public Assembler {
 
   // Convenience function: Same as above, but takes the fid instead.
   void CallRuntime(Runtime::FunctionId fid, int num_arguments);
+
+  // Convenience function: call an external reference.
+  void CallExternalReference(const ExternalReference& ext,
+                             int num_arguments);
 
   // Tail call of a runtime routine (jump).
   // Like JumpToExternalReference, but also takes care of passing the number
@@ -580,13 +527,13 @@ class MacroAssembler: public Assembler {
   Handle<Object> CodeObject() { return code_object_; }
 
 
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // Stack limit support
 
   void StackLimitCheck(Label* on_stack_limit_hit);
 
 
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // StatsCounter support
 
   void SetCounter(StatsCounter* counter, int value,
@@ -597,7 +544,7 @@ class MacroAssembler: public Assembler {
                         Register scratch1, Register scratch2);
 
 
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // Debugging
 
   // Calls Abort(msg) if the condition cc is not satisfied.
@@ -616,7 +563,7 @@ class MacroAssembler: public Assembler {
   void set_allow_stub_calls(bool value) { allow_stub_calls_ = value; }
   bool allow_stub_calls() { return allow_stub_calls_; }
 
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // Smi utilities
 
   // Jump if either of the registers contain a non-smi.
@@ -624,7 +571,7 @@ class MacroAssembler: public Assembler {
   // Jump if either of the registers contain a smi.
   void JumpIfEitherSmi(Register reg1, Register reg2, Label* on_either_smi);
 
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // String utilities
 
   // Checks if both instance types are sequential ASCII strings and jumps to
@@ -636,6 +583,28 @@ class MacroAssembler: public Assembler {
       Register scratch2,
       Label* failure);
 
+  // Check if instance type is sequential ASCII string and jump to label if
+  // it is not.
+  void JumpIfInstanceTypeIsNotSequentialAscii(Register type,
+                                              Register scratch,
+                                              Label* failure);
+
+  // Test that both first and second are sequential ASCII strings.
+  // Assume that they are non-smis.
+  void JumpIfNonSmisNotBothSequentialAsciiStrings(Register first,
+                                                  Register second,
+                                                  Register scratch1,
+                                                  Register scratch2,
+                                                  Label* failure);
+
+  // Test that both first and second are sequential ASCII strings.
+  // Check that they are non-smis.
+  void JumpIfNotBothSequentialAsciiStrings(Register first,
+                                           Register second,
+                                           Register scratch1,
+                                           Register scratch2,
+                                           Label* failure);
+
  private:
   List<Unresolved> unresolved_;
   bool generating_stub_;
@@ -643,8 +612,12 @@ class MacroAssembler: public Assembler {
   // This handle will be patched with the code object on installation.
   Handle<Object> code_object_;
 
+  void Jump(intptr_t target, RelocInfo::Mode rmode,
+            bool ProtectBranchDelaySlot = true);
   void Jump(intptr_t target, RelocInfo::Mode rmode, Condition cond = cc_always,
             Register r1 = zero_reg, const Operand& r2 = Operand(zero_reg),
+            bool ProtectBranchDelaySlot = true);
+  void Call(intptr_t target, RelocInfo::Mode rmode,
             bool ProtectBranchDelaySlot = true);
   void Call(intptr_t target, RelocInfo::Mode rmode, Condition cond = cc_always,
             Register r1 = zero_reg, const Operand& r2 = Operand(zero_reg),

@@ -41,14 +41,16 @@ namespace i = ::v8::internal;
 
 TEST(MIPSFunctionCalls) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
 
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
 
   const char* c_source =
-    "function foo(arg1, arg2, arg3, arg4, arg5) {"
+    "function foo() {"
+    "  return 0xabc0;"
+    "}"
+    "function foo1(arg1, arg2, arg3, arg4, arg5) {"
     "  return foo2(arg1, foo2(arg3, arg4));"
     "}"
     ""
@@ -57,18 +59,18 @@ TEST(MIPSFunctionCalls) {
     "}"
     // We call the function twice because it needs more code.
     // TODO(MIPS): Detail what more is needed.
-    "foo(1, 2, 3, 4, 5);"
-    "foo(1, 2, 3, 4, 5);";
+    "foo1(1, 2, 3, 4, 5);"
+    "foo1(1, 2, 3, 4, 5);"
+    "foo() + foo1(0xa, 0xb, 0xc, 0xd, 0xe);";
 
   Local<String> source = ::v8::String::New(c_source);
   Local<Script> script = ::v8::Script::Compile(source);
-  CHECK_EQ(4, script->Run()->Int32Value());
+  CHECK_EQ(0xabcd, script->Run()->Int32Value());
 }
 
 
 TEST(MIPSComparisons) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
 
   v8::HandleScope scope;
@@ -103,7 +105,6 @@ TEST(MIPSComparisons) {
 
 TEST(MIPSGlobalVariables) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
 
   v8::HandleScope scope;
@@ -135,7 +136,6 @@ TEST(MIPSGlobalVariables) {
 
 TEST(MIPSControlFlow) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
 
   v8::HandleScope scope;
@@ -205,7 +205,6 @@ TEST(MIPSControlFlow) {
 
 TEST(MIPSUnaryOperations) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -229,7 +228,6 @@ TEST(MIPSUnaryOperations) {
 
 TEST(MIPSCountOperation) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -247,26 +245,37 @@ TEST(MIPSCountOperation) {
 
 TEST(MIPSArrays) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
 
-  const char* c_source =
+  const char* c_source_1 =
     "myArray = [];"
     "myArray[1] = 0x10;"
     "myArray[2] = 0x20;"
     "myArray[3] = 0x30;"
     "myArray[2];";
-  Local<String> source = ::v8::String::New(c_source);
-  Local<Script> script = ::v8::Script::Compile(source);
-  CHECK_EQ(0x20, script->Run()->Int32Value());
+  Local<String> source_1 = ::v8::String::New(c_source_1);
+  Local<Script> script_1 = ::v8::Script::Compile(source_1);
+  CHECK_EQ(0x20, script_1->Run()->Int32Value());
+
+  const char* c_source_2 =
+    "var myArr = new Array();"
+    ""
+    "myArr[1] = 0xa;"
+    "myArr[2] = 0xb;"
+    "myArr[3] = 0xc;"
+    "myArr[4] = 0xd;"
+    "myArr[100] = 0xabc0;"
+    "myArr[100] + myArr[4];";
+  Local<String> source_2 = ::v8::String::New(c_source_2);
+  Local<Script> script_2 = ::v8::Script::Compile(source_2);
+  CHECK_EQ(0xabcd, script_2->Run()->Int32Value());
 }
 
 
 TEST(MIPSObjects) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -335,15 +344,126 @@ TEST(MIPSObjects) {
 }
 
 
+TEST(MIPSSpecialAssignment) {
+  // Disable compilation of natives.
+  i::FLAG_full_compiler = false;
+  v8::HandleScope scope;
+  LocalContext env;  // from cctest.h
+
+  const char* c_source_1 =
+    "var a = 1;"
+    "a += 2;"
+    "a *= 9;"
+    "a /= 3;"
+    "a -= 2;"
+    "a;";
+  Local<String> source_1 = ::v8::String::New(c_source_1);
+  Local<Script> script_1 = ::v8::Script::Compile(source_1);
+  CHECK_EQ(7, script_1->Run()->Int32Value());
+
+  const char* c_source_2 =
+    "var a = 123;"
+    "var b = 456;"
+    "var max = a > b ? a : b;"
+    "max;";
+  Local<String> source_2 = ::v8::String::New(c_source_2);
+  Local<Script> script_2 = ::v8::Script::Compile(source_2);
+  CHECK_EQ(456, script_2->Run()->Int32Value());
+}
+
+
+TEST(MIPSWith) {
+  // Disable compilation of natives.
+  i::FLAG_full_compiler = false;
+  v8::HandleScope scope;
+  LocalContext env;  // from cctest.h
+
+  // TODO(MIPS): foo1 and foo4 does not work properly when called in the "with"
+  // statement.
+  // More generally we fail accessing "this" in the with block code.
+  const char* c_source_1 =
+    "var globalVar = 0xb00;"
+    ""
+    "function Obj(prop1_) {"
+    "  this.prop1 = prop1_;"
+    "  this.foo1 = function () {return this.prop1;};"
+    "  this.foo2 = function () {return globalVar;};"
+    "  this.foo3 = function (arg) {return arg;};"
+    "  this.foo4 = globalFoo4;"
+    "}"
+    ""
+    "function globalFoo4() {"
+    "  return this.prop1;"
+    "}"
+    ""
+    "myObj = new Obj(0xbad);"
+    ""
+    "with(myObj) {"
+    "  prop1 = 0xd;"
+    "  prop1 + foo2() + foo3(0xa000);"
+    "}";
+  Local<String> source_1 = ::v8::String::New(c_source_1);
+  Local<Script> script_1 = ::v8::Script::Compile(source_1);
+  CHECK_EQ(0xab0d, script_1->Run()->Int32Value());
+}
+
+
+TEST(MIPSTryCatchFinally) {
+  // Disable compilation of natives.
+  i::FLAG_full_compiler = false;
+  v8::HandleScope scope;
+  LocalContext env;  // from cctest.h
+
+  const char* c_source =
+    "var res = 0x0;"
+    ""
+    "try {"
+    "  res = 0x123;"
+    "  throw 0x3333;"
+    "  res = 0xbad;"
+    "} catch (e) {"
+    "  res;"
+    "}"
+    ""
+    "res;";
+  Local<String> source = ::v8::String::New(c_source);
+  Local<Script> script = ::v8::Script::Compile(source);
+  CHECK_EQ(0x123, script->Run()->Int32Value());
+}
+
+
+TEST(MIPSForIn) {
+  i::FLAG_full_compiler = false;
+  v8::HandleScope scope;
+  LocalContext env;  // from cctest.h
+
+  const char* c_source =
+    "var c;"
+    "var cars = [];"
+    "cars[0] = 'Saab';"
+    "cars[1] = 'Volvo';"
+    "cars[2] = 'BMW';"
+    "cars[3] = 'Aston-Martin';"
+    "var names = '';"
+    " "
+    "for (c in cars) {"
+    "  names += cars[c] + ' ';"
+    "}"
+    " "
+    "names;" ;
+  Local<Value> result = CompileRun(c_source);
+  CHECK(result->IsString());
+  String::AsciiValue ascii1(result);
+  CHECK_EQ("Saab Volvo BMW Aston-Martin ", *ascii1);
+}
+
 
 // Binary op tests start with well-behaved Smi values, then step thru
 // corner cases, such as overflow from Smi value, to one Smi, one
 // non-Smi, then to float cases.
 
-
 TEST(MIPSBinaryAdd) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -405,7 +525,6 @@ TEST(MIPSBinaryAdd) {
 
 TEST(MIPSBinarySub) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -417,6 +536,18 @@ TEST(MIPSBinarySub) {
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
   CHECK_EQ(289, script->Run()->Int32Value());
+
+  // Check Smi sub literal.
+  js = "function f() { var a=1023; return a - 23; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(1000, script->Run()->Int32Value());
+
+  // Check literal sub Smi.
+  js = "function f() { var a=1023; return 2048 - a; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(1025, script->Run()->Int32Value());
 
   // Check large negative numbers, all Smi.
   js = "function f() {"
@@ -459,7 +590,6 @@ TEST(MIPSBinarySub) {
 
 TEST(MIPSBinaryMul) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -478,6 +608,12 @@ TEST(MIPSBinaryMul) {
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
   CHECK_EQ(-2295612, script->Run()->Int32Value());
+
+  // Check Smi multiply by literal.
+  js = "function f() { var a=7777; return a * 7; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(54439, script->Run()->Int32Value());
 
   // Check positive Smi multiply by 0.
   js = "function f() { var a=112233; var b=0; return a * b; }; f();";
@@ -509,7 +645,6 @@ TEST(MIPSBinaryMul) {
 
 TEST(MIPSBinaryDiv) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -528,6 +663,24 @@ TEST(MIPSBinaryDiv) {
   script = ::v8::Script::Compile(source);
   CHECK_EQ(112233, script->Run()->Int32Value());
 
+  // Check Smi divide, with fractional (Number) result.
+  js = "function f() { var a=5; var b=10; return a / b; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(0.5, script->Run()->NumberValue());
+
+  // Check Smi divide by literal.
+  js = "function f() { var a=10; return a / 5; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(2, script->Run()->Int32Value());
+
+  // Check literal divide by Smi.
+  js = "function f() { var a=10; return 500 / a; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(50, script->Run()->Int32Value());
+
   // Check negative 0 result causes conversion to HeapNumber.
   js = "function f() { var a=0; var b=-74; return a / b; }; f();";
   source = ::v8::String::New(js);
@@ -537,11 +690,11 @@ TEST(MIPSBinaryDiv) {
   // Check division of most-negative Smi by -1, to make illegal Smi.
   // results in conversion to legal HeapNumber.
   js = "function f() { var a=-1073741820; var b=-1; return a / b; }; f();";
-  // js = "function f() { var a=10; var b=-2; return a / b; }; f();";
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
   CHECK_EQ(1073741820.0, script->Run()->NumberValue());
 
+  // Check normal operation with doubles.
   js = "function f() { var a=173.5; var b=2.5; return a / b; }; f();";
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
@@ -551,7 +704,6 @@ TEST(MIPSBinaryDiv) {
 
 TEST(MIPSBinaryMod) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -570,6 +722,12 @@ TEST(MIPSBinaryMod) {
   script = ::v8::Script::Compile(source);
   CHECK_EQ(-4, script->Run()->Int32Value());
 
+  // Check Smi mod power-of-two literal.
+  js = "function f() { var a=0x8833; return a % 256; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(0x33, script->Run()->Int32Value());
+
   // Check negative 0 result causes conversion to HeapNumber.
   js = "function f() { var a=-44; var b=11; return a % b; }; f();";
   source = ::v8::String::New(js);
@@ -585,7 +743,6 @@ TEST(MIPSBinaryMod) {
 
 TEST(MIPSBinaryOr) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -597,6 +754,12 @@ TEST(MIPSBinaryOr) {
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
   CHECK_EQ(0x9f8383,  script->Run()->Int32Value());
+
+  // Check Smi or with literal.
+  js = "function f() { var a=0x1000; return  a | 0x34; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(0x1034,  script->Run()->Int32Value());
 
   // Check that non-Smi int32 values work, converted to Number.
   js =
@@ -622,7 +785,6 @@ TEST(MIPSBinaryOr) {
 
 TEST(MIPSBinaryAnd) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -637,6 +799,13 @@ TEST(MIPSBinaryAnd) {
   script = ::v8::Script::Compile(source);
   CHECK_EQ(0x01020304,  script->Run()->Int32Value());
 
+  // Check Smi and with literal.
+  js = "function f() { var a=0xffff; return a & 0x331248; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(0x1248,  script->Run()->Int32Value());
+
+
   // Check that non-Smi values work OK, returned as Number.
   js =
   "function f() { var a=0x7f0f0f0f; var b=0x61223344; return a & b; };"
@@ -650,7 +819,6 @@ TEST(MIPSBinaryAnd) {
 
 TEST(MIPSBinaryXor) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -660,6 +828,13 @@ TEST(MIPSBinaryXor) {
 
   js =
   "function f() { var a=0x0f0f0f0f; var b=0x11223344; return a ^ b; };"
+  "f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(0x1e2d3c4b, script->Run()->Int32Value());
+
+  // Check Smi xor with literal.
+  js = "function f() { var a=0x0f0f0f0f; return 0x11223344 ^ a; };"
   "f();";
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
@@ -677,7 +852,6 @@ TEST(MIPSBinaryXor) {
 
 TEST(MIPSBinaryShl) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -685,15 +859,25 @@ TEST(MIPSBinaryShl) {
   Local<String> source;
   Local<Script> script;
 
-  js =
-    "function f() { var a=0x400; var b=0x4; return a << b; }; f();";
+  js = "function f() { var a=0x400; var b=0x4; return a << b; }; f();";
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
   CHECK_EQ(0x4000, script->Run()->Int32Value());
 
+  // Check Smi left-shift by literal.
+  js = "function f() { var a=0x400; return a << 8; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(0x40000, script->Run()->Int32Value());
+
+  // Check literal left-shift by Smi.
+  js = "function f() { var a=12; return 0x0010 << a; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(0x10000, script->Run()->Int32Value());
+
   // Check left shift turning Smi to non-smi int32, returned as Number.
-  js =
-    "function f() { var a=0x30000000; var b=1; return a << b; }; f();";
+  js = "function f() { var a=0x30000000; var b=1; return a << b; }; f();";
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
   // 0x60000000 is 1610612736.
@@ -703,7 +887,6 @@ TEST(MIPSBinaryShl) {
 
 TEST(MIPSBinarySar) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -711,11 +894,22 @@ TEST(MIPSBinarySar) {
   Local<String> source;
   Local<Script> script;
 
-  js =
-    "function f() { var a=-16; var b=4; return a >> b; }; f();";
+  js = "function f() { var a=-16; var b=4; return a >> b; }; f();";
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
   CHECK_EQ(-1, script->Run()->Int32Value());
+
+  // Check Smi right-shifted by literal.
+  js = "function f() { var a=-256; return a >> 4; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(-16, script->Run()->Int32Value());
+
+  // Check literal right-shifted by Smi.
+  js = "function f() { var a=2; return 16 >> a; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(4, script->Run()->Int32Value());
 
   // Check that negative non-Smi int32 values work, returned as Smi.
   // -0x55555555 is too big for Smi, is Number with int32 value 0xaaaaaaab.
@@ -730,7 +924,6 @@ TEST(MIPSBinarySar) {
 
 TEST(MIPSBinaryShr) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
@@ -738,11 +931,22 @@ TEST(MIPSBinaryShr) {
   Local<String> source;
   Local<Script> script;
 
-  js =
-    "function f() { var a=-1; var b=0x4; return a >>> b; }; f();";
+  js = "function f() { var a=-1; var b=0x4; return a >>> b; }; f();";
   source = ::v8::String::New(js);
   script = ::v8::Script::Compile(source);
   CHECK_EQ(0x0fffffff, script->Run()->Int32Value());
+
+  // Check Smi right-shifted by literal.
+  js = "function f() { var a=256; return a >>> 4; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(16, script->Run()->Int32Value());
+
+  // Check literal right-shifted by Smi.
+  js = "function f() { var a=2; return 64 >>> a; }; f();";
+  source = ::v8::String::New(js);
+  script = ::v8::Script::Compile(source);
+  CHECK_EQ(16, script->Run()->Int32Value());
 
   // Check that almost-max negative non-Smi int32, shifted by 1, is
   // properly returned as number, since the positive value 0x40000000
@@ -758,7 +962,6 @@ TEST(MIPSBinaryShr) {
 
 TEST(MIPSAddString) {
   // Disable compilation of natives.
-  i::FLAG_disable_native_files = true;
   i::FLAG_full_compiler = false;
   v8::HandleScope scope;
   LocalContext env;  // from cctest.h
