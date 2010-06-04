@@ -762,7 +762,7 @@ TEST(MIPS9) {
 #endif
 }
 
-TEST(MIPS10) {
+TEST(MIPS11) {
   // Test LWL, LWR, SWL and SWR instructions.
   InitializeVM();
   v8::HandleScope scope;
