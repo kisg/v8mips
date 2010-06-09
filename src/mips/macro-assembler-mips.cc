@@ -1476,8 +1476,69 @@ void MacroAssembler::Call(Label* target) {
 
 
 #ifdef ENABLE_DEBUGGER_SUPPORT
-  // ---------------------------------------------------------------------------
-  // Debugger Support
+// ---------------------------------------------------------------------------
+// Debugger Support
+
+void MacroAssembler::SaveRegistersToMemory(RegList regs) {
+  ASSERT((regs & ~kJSCallerSaved) == 0);
+  // Copy the content of registers to memory location.
+  for (int i = 0; i < kNumJSCallerSaved; i++) {
+    int r = JSCallerSavedCode(i);
+    if ((regs & (1 << r)) != 0) {
+      Register reg = { r };
+      li(at, Operand(ExternalReference(Debug_Address::Register(i))));
+      sw(reg, MemOperand(at));
+    }
+  }
+}
+
+
+void MacroAssembler::RestoreRegistersFromMemory(RegList regs) {
+  ASSERT((regs & ~kJSCallerSaved) == 0);
+  // Copy the content of memory location to registers.
+  for (int i = kNumJSCallerSaved; --i >= 0;) {
+    int r = JSCallerSavedCode(i);
+    if ((regs & (1 << r)) != 0) {
+      Register reg = { r };
+      li(at, Operand(ExternalReference(Debug_Address::Register(i))));
+      lw(reg, MemOperand(at));
+    }
+  }
+}
+
+
+void MacroAssembler::CopyRegistersFromMemoryToStack(Register base,
+                                                    RegList regs) {
+  ASSERT((regs & ~kJSCallerSaved) == 0);
+  // Copy the content of the memory location to the stack and adjust base.
+  for (int i = kNumJSCallerSaved; --i >= 0;) {
+    int r = JSCallerSavedCode(i);
+    if ((regs & (1 << r)) != 0) {
+      li(at, Operand(ExternalReference(Debug_Address::Register(i))));
+      lw(at, MemOperand(at));
+      addiu(base, base, -kPointerSize);
+      sw(at, MemOperand(base));
+    }
+  }
+}
+
+
+void MacroAssembler::CopyRegistersFromStackToMemory(Register base,
+                                                    Register scratch,
+                                                    RegList regs) {
+  ASSERT((regs & ~kJSCallerSaved) == 0);
+  // Copy the content of the stack to the memory location and adjust base.
+  for (int i = 0; i < kNumJSCallerSaved; i++) {
+    int r = JSCallerSavedCode(i);
+    if ((regs & (1 << r)) != 0) {
+      li(at, Operand(ExternalReference(Debug_Address::Register(i))));
+      lw(scratch, MemOperand(base));
+      addiu(base, base, kPointerSize);
+      sw(scratch, MemOperand(at));
+    }
+  }
+}
+
 
 void MacroAssembler::DebugBreak() {
   ASSERT(allow_stub_calls());
@@ -1486,7 +1547,8 @@ void MacroAssembler::DebugBreak() {
   CEntryStub ces(1);
   Call(ces.GetCode(), RelocInfo::DEBUG_BREAK);
 }
-#endif
+
+#endif  // ENABLE_DEBUGGER_SUPPORT
 
 
 // ---------------------------------------------------------------------------
@@ -2527,6 +2589,41 @@ void MacroAssembler::JumpIfInstanceTypeIsNotSequentialAscii(Register type,
 }
 
 #undef BRANCH_ARGS_CHECK
+
+
+#ifdef ENABLE_DEBUGGER_SUPPORT
+CodePatcher::CodePatcher(byte* address, int instructions)
+    : address_(address),
+      instructions_(instructions),
+      size_(instructions * Assembler::kInstrSize),
+      masm_(address, size_ + Assembler::kGap) {
+  // Create a new macro assembler pointing to the address of the code to patch.
+  // The size is adjusted with kGap on order for the assembler to generate size
+  // bytes of instructions without failing with buffer size constraints.
+  ASSERT(masm_.reloc_info_writer.pos() == address_ + size_ + Assembler::kGap);
+}
+
+
+CodePatcher::~CodePatcher() {
+  // Indicate that code has changed.
+  CPU::FlushICache(address_, size_);
+
+  // Check that the code was patched as expected.
+  ASSERT(masm_.pc_ == address_ + size_);
+  ASSERT(masm_.reloc_info_writer.pos() == address_ + size_ + Assembler::kGap);
+}
+
+
+void CodePatcher::Emit(Instr x) {
+  masm()->emit(x);
+}
+
+
+void CodePatcher::Emit(Address addr) {
+  masm()->emit(reinterpret_cast<Instr>(addr));
+}
+#endif  // ENABLE_DEBUGGER_SUPPORT
+
 
 } }  // namespace v8::internal
 
