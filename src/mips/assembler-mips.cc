@@ -618,6 +618,7 @@ void Assembler::b(int16_t offset) {
 
 
 void Assembler::bal(int16_t offset) {
+  WriteRecordedPositions();
   bgezal(zero_reg, offset);
 }
 
@@ -633,6 +634,7 @@ void Assembler::bgez(Register rs, int16_t offset) {
 
 
 void Assembler::bgezal(Register rs, int16_t offset) {
+  WriteRecordedPositions();
   GenInstrImmediate(REGIMM, rs, BGEZAL, offset);
 }
 
@@ -653,6 +655,7 @@ void Assembler::bltz(Register rs, int16_t offset) {
 
 
 void Assembler::bltzal(Register rs, int16_t offset) {
+  WriteRecordedPositions();
   GenInstrImmediate(REGIMM, rs, BLTZAL, offset);
 }
 
@@ -669,17 +672,22 @@ void Assembler::j(int32_t target) {
 
 
 void Assembler::jr(Register rs) {
+  if (rs.is(ra)) {
+    WriteRecordedPositions();
+  }
   GenInstrRegister(SPECIAL, rs, zero_reg, zero_reg, 0, JR);
 }
 
 
 void Assembler::jal(int32_t target) {
+  WriteRecordedPositions();
   ASSERT(is_uint28(target) && ((target & 3) == 0));
   GenInstrJump(JAL, target >> 2);
 }
 
 
 void Assembler::jalr(Register rs, Register rd) {
+  WriteRecordedPositions();
   GenInstrRegister(SPECIAL, rs, zero_reg, rd, 0, JALR);
 }
 
@@ -836,6 +844,16 @@ void Assembler::lw(Register rd, const MemOperand& rs) {
 }
 
 
+void Assembler::lwl(Register rd, const MemOperand& rs) {
+  GenInstrImmediate(LWL, rs.rm(), rd, rs.offset_);
+}
+
+
+void Assembler::lwr(Register rd, const MemOperand& rs) {
+  GenInstrImmediate(LWR, rs.rm(), rd, rs.offset_);
+}
+
+
 void Assembler::sb(Register rd, const MemOperand& rs) {
   GenInstrImmediate(SB, rs.rm(), rd, rs.offset_);
 }
@@ -848,6 +866,16 @@ void Assembler::sh(Register rd, const MemOperand& rs) {
 
 void Assembler::sw(Register rd, const MemOperand& rs) {
   GenInstrImmediate(SW, rs.rm(), rd, rs.offset_);
+}
+
+
+void Assembler::swl(Register rd, const MemOperand& rs) {
+  GenInstrImmediate(SWL, rs.rm(), rd, rs.offset_);
+}
+
+
+void Assembler::swr(Register rd, const MemOperand& rs) {
+  GenInstrImmediate(SWR, rs.rm(), rd, rs.offset_);
 }
 
 
@@ -1065,6 +1093,16 @@ void Assembler::cvt_w_d(FPURegister fd, FPURegister fs) {
 }
 
 
+void Assembler::trunc_w_s(FPURegister fd, FPURegister fs) {
+  GenInstrRegister(COP1, S, f0, fs, fd, TRUNC_W_S);
+}
+
+
+void Assembler::trunc_w_d(FPURegister fd, FPURegister fs) {
+  GenInstrRegister(COP1, D, f0, fs, fd, TRUNC_W_D);
+}
+
+
 void Assembler::cvt_l_s(FPURegister fd, FPURegister fs) {
   GenInstrRegister(COP1, S, f0, fs, fd, CVT_L_S);
 }
@@ -1072,6 +1110,16 @@ void Assembler::cvt_l_s(FPURegister fd, FPURegister fs) {
 
 void Assembler::cvt_l_d(FPURegister fd, FPURegister fs) {
   GenInstrRegister(COP1, D, f0, fs, fd, CVT_L_D);
+}
+
+
+void Assembler::trunc_l_s(FPURegister fd, FPURegister fs) {
+  GenInstrRegister(COP1, S, f0, fs, fd, TRUNC_L_S);
+}
+
+
+void Assembler::trunc_l_d(FPURegister fd, FPURegister fs) {
+  GenInstrRegister(COP1, D, f0, fs, fd, TRUNC_L_D);
 }
 
 

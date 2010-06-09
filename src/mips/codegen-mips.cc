@@ -177,6 +177,9 @@ void CodeGenerator::Generate(CompilationInfo* info) {
     }
 #endif
 
+    // Arm codegen supports secondary mode, which mips doesn't support yet.
+    // For now, make sure we're always called as primary.
+    ASSERT(info->mode() == CompilationInfo::PRIMARY);
     frame_->Enter();
 
     // Allocate space for locals and initialize them.
@@ -326,10 +329,10 @@ void CodeGenerator::Generate(CompilationInfo* info) {
 
     // We don't check for the return code size. It may differ if the number of
     // arguments is too big.
-    __ mov(sp, fp);
-    __ lw(fp, MemOperand(sp, 0));
-    __ lw(ra, MemOperand(sp, 4));
-    __ addiu(sp, sp, 8);
+
+    // Tear down the frame which will restore the caller's frame pointer and
+    // the link register.
+    frame_->Exit();
 
     __ Addu(sp, sp, Operand((scope()->num_parameters() + 1) * kPointerSize));
     __ Ret();
@@ -3008,17 +3011,17 @@ void CodeGenerator::VisitCall(Call* node) {
 
       LoadAndSpill(property->obj());
       LoadAndSpill(property->key());
-      EmitKeyedLoad(false);
+      EmitKeyedLoad(false);  // Load from Keyed Property: result in v0.
       frame_->Drop();  // key
       // Put the function below the receiver.
       if (property->is_synthetic()) {
         // Use the global receiver.
         frame_->Drop();
-        frame_->EmitPush(a0);
+        frame_->EmitPush(v0);
         LoadGlobalReceiver(a0);
       } else {
         frame_->EmitPop(a1);  // receiver
-        frame_->EmitPush(a0);  // function
+        frame_->EmitPush(v0);  // function
         frame_->EmitPush(a1);  // receiver
       }
 
@@ -5244,7 +5247,7 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
 
   // TODO(MIPS): As of 26May10, Arm code has frame-alignment checks
   // and modification code here.
-  
+
   // We are calling compiled C/C++ code. a0 and a1 hold our two arguments. We
   // also need the argument slots.
   __ jalr(s2);  // Use delay slot for sp adjustment.
@@ -6043,7 +6046,7 @@ static void GetInt32(MacroAssembler* masm,
     // The original 'Exponent' word is still in scratch.
     __ lwc1(f12, FieldMemOperand(source, HeapNumber::kMantissaOffset));
     __ mtc1(scratch, f13);
-    __ cvt_w_d(f0, f12);
+    __ trunc_w_d(f0, f12);
     __ mfc1(dest, f0);
   } else {
     // On entry, dest has final downshift, scratch has original sign/exp/mant.
@@ -6678,9 +6681,105 @@ void StringStubBase::GenerateCopyCharactersLong(MacroAssembler* masm,
                                                 Register scratch4,
                                                 Register scratch5,
                                                 int flags) {
-  // Postpone coding of optimized (long) version, until basics work.
   bool ascii = (flags & COPY_ASCII) != 0;
-  GenerateCopyCharacters(masm, dest, src, count, scratch1, ascii);
+  bool dest_always_aligned = (flags & DEST_ALWAYS_ALIGNED) != 0;
+
+  if (dest_always_aligned && FLAG_debug_code) {
+    // Check that destination is actually word aligned if the flag says
+    // that it is.
+    __ And(scratch4, dest, Operand(kPointerAlignmentMask));
+    __ Check(eq,
+             "Destination of copy not aligned.",
+             scratch4,
+             Operand(zero_reg));
+  }
+
+  const int kReadAlignment = 4;
+  const int kReadAlignmentMask = kReadAlignment - 1;
+  // Ensure that reading an entire aligned word containing the last character
+  // of a string will not read outside the allocated area (because we pad up
+  // to kObjectAlignment).
+  ASSERT(kObjectAlignment >= kReadAlignment);
+  // Assumes word reads and writes are little endian.
+  // Nothing to do for zero characters.
+  Label done;
+
+  if (!ascii) {
+    __ addu(count, count, count);
+  }
+  __ Branch(&done, eq, count, Operand(zero_reg));
+
+  Label byte_loop;
+  // Must copy at least eight bytes, otherwise just do it one byte at a time.
+  __ Subu(scratch1, count, Operand(8));
+  __ Addu(count, dest, Operand(count));
+  Register limit = count;  // Read until src equals this.
+  __ Branch(&byte_loop, lt, scratch1, Operand(zero_reg));
+
+  if (!dest_always_aligned) {
+    // Align dest by byte copying. Copies between zero and three bytes.
+    __ And(scratch4, dest, Operand(kReadAlignmentMask));
+    Label dest_aligned;
+    __ Branch(&dest_aligned, eq, scratch4, Operand(zero_reg));
+    Label aligned_loop;
+    __ bind(&aligned_loop);
+    __ lbu(scratch1, MemOperand(src));
+    __ addiu(src, src, 1);
+    __ sb(scratch1, MemOperand(dest));
+    __ addiu(dest, dest, 1);
+    __ addiu(scratch4, scratch4, 1);
+    __ Branch(&aligned_loop, le, scratch4, Operand(kReadAlignmentMask));
+    __ bind(&dest_aligned);
+  }
+
+  Label simple_loop;
+
+  __ And(scratch4, src, Operand(kReadAlignmentMask));
+  __ Branch(&simple_loop, eq, scratch4, Operand(zero_reg));
+
+  // Loop for src/dst that are not aligned the same way.
+  // This loop uses lwl and lwr instructions. These instructions
+  // depend on the endianness, and the implementation assumes little-endian.
+  {
+    Label loop;
+    __ bind(&loop);
+    __ lwr(scratch1, MemOperand(src));
+    __ Addu(src, src, Operand(kReadAlignment));
+    __ lwl(scratch1, MemOperand(src, -1));
+    __ sw(scratch1, MemOperand(dest));
+    __ Addu(dest, dest, Operand(kReadAlignment));
+    __ Subu(scratch2, limit, dest);
+    __ Branch(&loop, ge, scratch2, Operand(kReadAlignment));
+  }
+
+  __ Branch(&byte_loop, al);
+
+  // Simple loop.
+  // Copy words from src to dest, until less than four bytes left.
+  // Both src and dest are word aligned.
+  __ bind(&simple_loop);
+  {
+    Label loop;
+    __ bind(&loop);
+    __ lw(scratch1, MemOperand(src));
+    __ Addu(src, src, Operand(kReadAlignment));
+    __ sw(scratch1, MemOperand(dest));
+    __ Addu(dest, dest, Operand(kReadAlignment));
+    __ Subu(scratch2, limit, dest);
+    __ Branch(&loop, ge, scratch2, Operand(kReadAlignment));
+  }
+
+  // Copy bytes from src to dest until dest hits limit.
+  __ bind(&byte_loop);
+  // Test if dest has already reached the limit
+  __ Branch(&done, ge, dest, Operand(limit));
+  __ lbu(scratch1, MemOperand(src));
+  __ addiu(src, src, 1);
+  __ sb(scratch1, MemOperand(dest));
+  __ addiu(dest, dest, 1);
+  __ Branch(&byte_loop, al);
+
+  __ bind(&done);
 }
 
 
@@ -7460,7 +7559,7 @@ void CallFunctionStub::Generate(MacroAssembler* masm) {
     __ Push(a1);
     __ InvokeBuiltin(Builtins::TO_OBJECT, CALL_JS);
     __ LeaveInternalFrame();
-    __ sw(a0, MemOperand(sp, argc_ * kPointerSize));
+    __ sw(v0, MemOperand(sp, argc_ * kPointerSize));
 
     __ bind(&receiver_is_js_object);
   }

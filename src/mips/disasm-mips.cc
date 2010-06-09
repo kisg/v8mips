@@ -490,6 +490,12 @@ void Decoder::DecodeTypeRegister(Instruction* instr) {
             case CVT_L_D:
               Format(instr, "cvt.l.d 'fd, 'fs");
               break;
+            case TRUNC_W_D:
+              Format(instr, "trunc.w.d 'fd, 'fs");
+              break;
+            case TRUNC_L_D:
+              Format(instr, "trunc.l.d 'fd, 'fs");
+              break;
             case CVT_S_D:
               Format(instr, "cvt.s.d 'fd, 'fs");
               break;
@@ -787,6 +793,9 @@ void Decoder::DecodeTypeImmediate(Instruction* instr) {
     case LH:
       Format(instr, "lh     'rt, 'imm16s('rs)");
       break;
+    case LWL:
+      Format(instr, "lwl    'rt, 'imm16s('rs)");
+      break;
     case LW:
       Format(instr, "lw     'rt, 'imm16s('rs)");
       break;
@@ -796,14 +805,23 @@ void Decoder::DecodeTypeImmediate(Instruction* instr) {
     case LHU:
       Format(instr, "lhu    'rt, 'imm16s('rs)");
       break;
+    case LWR:
+      Format(instr, "lwr    'rt, 'imm16s('rs)");
+      break;
     case SB:
       Format(instr, "sb     'rt, 'imm16s('rs)");
       break;
     case SH:
       Format(instr, "sh     'rt, 'imm16s('rs)");
       break;
+    case SWL:
+      Format(instr, "swl    'rt, 'imm16s('rs)");
+      break;
     case SW:
       Format(instr, "sw     'rt, 'imm16s('rs)");
+      break;
+    case SWR:
+      Format(instr, "swr    'rt, 'imm16s('rs)");
       break;
     case LWC1:
       Format(instr, "lwc1   'ft, 'imm16s('rs)");
