@@ -4837,9 +4837,8 @@ void EmitNanCheck(MacroAssembler* masm, Condition cc) {
   Label lhs_not_nan_exp_mask_is_loaded;
 
   Register exp_mask_reg = t4;
-
   __ li(exp_mask_reg, HeapNumber::kExponentMask);
-  __ xor_(t5, lhs_exponent, exp_mask_reg);
+  __ and_(t5, lhs_exponent, exp_mask_reg);
   __ Branch(&lhs_not_nan_exp_mask_is_loaded, ne, t5, Operand(exp_mask_reg));
 
   __ sll(t5, lhs_exponent, HeapNumber::kNonMantissaBitsInTopWord);
@@ -4849,7 +4848,7 @@ void EmitNanCheck(MacroAssembler* masm, Condition cc) {
 
   __ li(exp_mask_reg, HeapNumber::kExponentMask);
   __ bind(&lhs_not_nan_exp_mask_is_loaded);
-  __ xor_(t5, rhs_exponent, exp_mask_reg);
+  __ and_(t5, rhs_exponent, exp_mask_reg);
 
   __ Branch(&neither_is_nan, ne, t5, Operand(exp_mask_reg));
 
@@ -5866,9 +5865,9 @@ static void HandleBinaryOpSlowCases(MacroAssembler* masm,
   // using registers f12 and f14 for the double values.
 
 // plind debug - implement fmod in fpu instructions.
-  bool use_fp_registers = CpuFeatures::IsSupported(FPU);
-  // bool use_fp_registers = CpuFeatures::IsSupported(FPU) &&
-  //   Token::MOD != operation;
+//  bool use_fp_registers = CpuFeatures::IsSupported(FPU);
+  bool use_fp_registers = CpuFeatures::IsSupported(FPU) &&
+      Token::MOD != operation;
 
   if (use_fp_registers) {
     CpuFeatures::Scope scope(FPU);
