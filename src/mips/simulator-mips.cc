@@ -155,6 +155,8 @@ bool Debugger::GetValue(const char* desc, int32_t* value) {
   if (regnum != kInvalidRegister) {
     *value = GetRegisterValue(regnum);
     return true;
+  } else if (strncmp(desc, "0x", 2) == 0) {
+    return SScanF(desc, "%x", (uint32_t*) value) == 1;
   } else {
     return SScanF(desc, "%i", value) == 1;
   }
