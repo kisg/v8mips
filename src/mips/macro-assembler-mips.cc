@@ -819,6 +819,7 @@ void MacroAssembler::Branch(int16_t offset, Condition cond, Register rs,
           bne(scratch, zero_reg, offset);
         } else {
           r2 = scratch;
+          li(r2, rt);
           slt(scratch, rs, r2);
           bne(scratch, zero_reg, offset);
         }
@@ -852,6 +853,7 @@ void MacroAssembler::Branch(int16_t offset, Condition cond, Register rs,
           beq(scratch, zero_reg, offset);
         } else {
           r2 = scratch;
+          li(r2, rt);
           sltu(scratch, rs, r2);
           beq(scratch, zero_reg, offset);
         }
@@ -864,6 +866,7 @@ void MacroAssembler::Branch(int16_t offset, Condition cond, Register rs,
           bne(scratch, zero_reg, offset);
         } else {
           r2 = scratch;
+          li(r2, rt);
           sltu(scratch, rs, r2);
           bne(scratch, zero_reg, offset);
         }
@@ -1044,7 +1047,7 @@ void MacroAssembler::Branch(Label* L, Condition cond, Register rs,
           bne(scratch, zero_reg, offset);
         }
         break;
-        case greater_equal:
+      case greater_equal:
         if (rt.imm32_ == 0) {
           offset = shifted_branch_offset(L, false);
           bgez(rs, offset);
@@ -1070,6 +1073,7 @@ void MacroAssembler::Branch(Label* L, Condition cond, Register rs,
           bne(scratch, zero_reg, offset);
         } else {
           r2 = scratch;
+          li(r2, rt);
           slt(scratch, rs, r2);
           offset = shifted_branch_offset(L, false);
           bne(scratch, zero_reg, offset);
@@ -1110,6 +1114,7 @@ void MacroAssembler::Branch(Label* L, Condition cond, Register rs,
           beq(scratch, zero_reg, offset);
         } else {
           r2 = scratch;
+          li(r2, rt);
           sltu(scratch, rs, r2);
           offset = shifted_branch_offset(L, false);
           beq(scratch, zero_reg, offset);
@@ -1125,6 +1130,7 @@ void MacroAssembler::Branch(Label* L, Condition cond, Register rs,
           bne(scratch, zero_reg, offset);
         } else {
           r2 = scratch;
+          li(r2, rt);
           sltu(scratch, rs, r2);
           offset = shifted_branch_offset(L, false);
           bne(scratch, zero_reg, offset);
@@ -1476,8 +1482,69 @@ void MacroAssembler::Call(Label* target) {
 
 
 #ifdef ENABLE_DEBUGGER_SUPPORT
-  // ---------------------------------------------------------------------------
-  // Debugger Support
+// ---------------------------------------------------------------------------
+// Debugger Support
+
+void MacroAssembler::SaveRegistersToMemory(RegList regs) {
+  ASSERT((regs & ~kJSCallerSaved) == 0);
+  // Copy the content of registers to memory location.
+  for (int i = 0; i < kNumJSCallerSaved; i++) {
+    int r = JSCallerSavedCode(i);
+    if ((regs & (1 << r)) != 0) {
+      Register reg = { r };
+      li(at, Operand(ExternalReference(Debug_Address::Register(i))));
+      sw(reg, MemOperand(at));
+    }
+  }
+}
+
+
+void MacroAssembler::RestoreRegistersFromMemory(RegList regs) {
+  ASSERT((regs & ~kJSCallerSaved) == 0);
+  // Copy the content of memory location to registers.
+  for (int i = kNumJSCallerSaved; --i >= 0;) {
+    int r = JSCallerSavedCode(i);
+    if ((regs & (1 << r)) != 0) {
+      Register reg = { r };
+      li(at, Operand(ExternalReference(Debug_Address::Register(i))));
+      lw(reg, MemOperand(at));
+    }
+  }
+}
+
+
+void MacroAssembler::CopyRegistersFromMemoryToStack(Register base,
+                                                    RegList regs) {
+  ASSERT((regs & ~kJSCallerSaved) == 0);
+  // Copy the content of the memory location to the stack and adjust base.
+  for (int i = kNumJSCallerSaved; --i >= 0;) {
+    int r = JSCallerSavedCode(i);
+    if ((regs & (1 << r)) != 0) {
+      li(at, Operand(ExternalReference(Debug_Address::Register(i))));
+      lw(at, MemOperand(at));
+      addiu(base, base, -kPointerSize);
+      sw(at, MemOperand(base));
+    }
+  }
+}
+
+
+void MacroAssembler::CopyRegistersFromStackToMemory(Register base,
+                                                    Register scratch,
+                                                    RegList regs) {
+  ASSERT((regs & ~kJSCallerSaved) == 0);
+  // Copy the content of the stack to the memory location and adjust base.
+  for (int i = 0; i < kNumJSCallerSaved; i++) {
+    int r = JSCallerSavedCode(i);
+    if ((regs & (1 << r)) != 0) {
+      li(at, Operand(ExternalReference(Debug_Address::Register(i))));
+      lw(scratch, MemOperand(base));
+      addiu(base, base, kPointerSize);
+      sw(scratch, MemOperand(at));
+    }
+  }
+}
+
 
 void MacroAssembler::DebugBreak() {
   ASSERT(allow_stub_calls());
@@ -1486,7 +1553,8 @@ void MacroAssembler::DebugBreak() {
   CEntryStub ces(1);
   Call(ces.GetCode(), RelocInfo::DEBUG_BREAK);
 }
-#endif
+
+#endif  // ENABLE_DEBUGGER_SUPPORT
 
 
 // ---------------------------------------------------------------------------
@@ -2364,13 +2432,8 @@ void MacroAssembler::EnterExitFrame(ExitFrame::Mode mode,
   sw(fp, MemOperand(sp, 0));
   mov(fp, sp);  // Setup new frame pointer.
 
-  // Push debug marker.
-  if (mode == ExitFrame::MODE_DEBUG) {
-    Push(zero_reg);
-  } else {
-    li(t8, Operand(CodeObject()));
-    Push(t8);
-  }
+  li(t8, Operand(CodeObject()));
+  Push(t8);  // Accessed from ExitFrame::code_slot.
 
   // Save the frame pointer and the context in top.
   LoadExternalReference(t8, ExternalReference(Top::k_c_entry_fp_address));
@@ -2381,10 +2444,32 @@ void MacroAssembler::EnterExitFrame(ExitFrame::Mode mode,
   // Setup argc and the builtin function in callee-saved registers.
   mov(hold_argc, a0);
   mov(hold_function, a1);
+
+
+  #ifdef ENABLE_DEBUGGER_SUPPORT
+    // Save the state of all registers to the stack from the memory
+    // location. This is needed to allow nested break points.
+    if (mode == ExitFrame::MODE_DEBUG) {
+      // Use sp as base to push.
+      CopyRegistersFromMemoryToStack(sp, kJSCallerSaved);
+    }
+  #endif
 }
 
 
 void MacroAssembler::LeaveExitFrame(ExitFrame::Mode mode) {
+#ifdef ENABLE_DEBUGGER_SUPPORT
+  // Restore the memory copy of the registers by digging them out from
+  // the stack. This is needed to allow nested break points.
+  if (mode == ExitFrame::MODE_DEBUG) {
+    // This code intentionally clobbers a2 and a3.
+    const int kCallerSavedSize = kNumJSCallerSaved * kPointerSize;
+    const int kOffset = ExitFrameConstants::kCodeOffset - kCallerSavedSize;
+    Addu(a3, fp, Operand(kOffset));
+    CopyRegistersFromStackToMemory(a3, a2, kJSCallerSaved);
+  }
+#endif
+
   // Clear top frame.
   LoadExternalReference(t8, ExternalReference(Top::k_c_entry_fp_address));
   sw(zero_reg, MemOperand(t8));
@@ -2527,6 +2612,41 @@ void MacroAssembler::JumpIfInstanceTypeIsNotSequentialAscii(Register type,
 }
 
 #undef BRANCH_ARGS_CHECK
+
+
+#ifdef ENABLE_DEBUGGER_SUPPORT
+CodePatcher::CodePatcher(byte* address, int instructions)
+    : address_(address),
+      instructions_(instructions),
+      size_(instructions * Assembler::kInstrSize),
+      masm_(address, size_ + Assembler::kGap) {
+  // Create a new macro assembler pointing to the address of the code to patch.
+  // The size is adjusted with kGap on order for the assembler to generate size
+  // bytes of instructions without failing with buffer size constraints.
+  ASSERT(masm_.reloc_info_writer.pos() == address_ + size_ + Assembler::kGap);
+}
+
+
+CodePatcher::~CodePatcher() {
+  // Indicate that code has changed.
+  CPU::FlushICache(address_, size_);
+
+  // Check that the code was patched as expected.
+  ASSERT(masm_.pc_ == address_ + size_);
+  ASSERT(masm_.reloc_info_writer.pos() == address_ + size_ + Assembler::kGap);
+}
+
+
+void CodePatcher::Emit(Instr x) {
+  masm()->emit(x);
+}
+
+
+void CodePatcher::Emit(Address addr) {
+  masm()->emit(reinterpret_cast<Instr>(addr));
+}
+#endif  // ENABLE_DEBUGGER_SUPPORT
+
 
 } }  // namespace v8::internal
 
