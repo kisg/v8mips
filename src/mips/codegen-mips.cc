@@ -1228,19 +1228,19 @@ void CodeGenerator::Comparison(Condition cc,
   // Implement '>' and '<=' by reversal to obtain ECMA-262 conversion order.
   if (cc == greater || cc == less_equal) {
     cc = ReverseCondition(cc);
-    frame_->EmitPop(a0);
-    frame_->EmitPop(a1);
+    frame_->EmitPop(a0);  // Lhs of reversed condition in a0.
+    frame_->EmitPop(a1);  // Rhs of reversed condition in a1.
   } else {
-    frame_->EmitPop(a1);
-    frame_->EmitPop(a0);
+    frame_->EmitPop(a1);  // Rhs in a1.
+    frame_->EmitPop(a0);  // Lhs in a0.
   }
   __ Or(t0, a0, a1);
   __ And(t1, t0, kSmiTagMask);
   smi.Branch(eq, t1, Operand(zero_reg), no_hint);
 
   // Perform non-smi comparison by stub.
-  // CompareStub takes arguments in a0 and a1, returns <0, >0 or 0 in v0.
-  // We call with 0 args because there are 0 on the stack.
+  // CompareStub takes arguments in a0 (lhs) and a1 (rhs), returns
+  // <0, >0 or 0 in v0. We call with 0 args because there are 0 on the stack.
   CompareStub stub(cc, strict);
   frame_->CallStub(&stub, 0);
   __ mov(condReg1, v0);
@@ -2917,8 +2917,9 @@ void CodeGenerator::VisitCall(Call* node) {
     frame_->CallRuntime(Runtime::kResolvePossiblyDirectEval, 3);
 
     // Touch up stack with the right values for the function and the receiver.
+    // Runtime::kResolvePossiblyDirectEval returns object pair in v0/v1.
     __ sw(v0, MemOperand(sp, (arg_count + 1) * kPointerSize));
-    __ sw(a1, MemOperand(sp, arg_count * kPointerSize));
+    __ sw(v1, MemOperand(sp, arg_count * kPointerSize));
 
     // Call the function.
     CodeForSourcePosition(node->position());
@@ -3592,14 +3593,12 @@ void CodeGenerator::GenerateSubString(ZoneList<Expression*>* args) {
 
 
 void CodeGenerator::GenerateStringCompare(ZoneList<Expression*>* args) {
-__ break_(__LINE__);
   ASSERT_EQ(2, args->length());
 
   Load(args->at(0));
   Load(args->at(1));
 
   StringCompareStub stub;
-  __ break_(__LINE__);
   frame_->CallStub(&stub, 2);
   frame_->EmitPush(v0);
 }
@@ -5201,8 +5200,8 @@ void NumberToStringStub::Generate(MacroAssembler* masm) {
 }
 
 
-// On entry a0 and a1 are the things to be compared. On exit v0 is 0,
-// positive or negative to indicate the result of the comparison.
+// On entry a0 (lhs) and a1 (rhs) are the things to be compared. On exit, v0
+// is 0, positive, or negative (smi) to indicate the result of the comparison.
 void CompareStub::Generate(MacroAssembler* masm) {
   Label slow;  // Call builtin.
   Label not_smis, both_loaded_as_doubles;
@@ -5286,8 +5285,9 @@ void CompareStub::Generate(MacroAssembler* masm) {
   // Never falls through to here.
 
   __ bind(&slow);
-  // TOCHECK: Check push order. In Comparison() we pop in the reverse order.................Alexandre....
-  __ MultiPush(a1.bit() | a0.bit());
+  // Prepare for call to builtin. Push object pointers, a0 (lhs) first,
+  // a1 (lhs) second.
+  __ MultiPushReversed(a1.bit() | a0.bit());
   // Figure out which native to call and setup the arguments.
   Builtins::JavaScript native;
   if (cc_ == eq) {
@@ -5445,19 +5445,64 @@ void CEntryStub::GenerateCore(MacroAssembler* masm,
     __ sw(a1, MemOperand(a0));
   }
 
-  // Call C built-in.
-  // a0 = argc, a1 = argv
+  // Prepare arguments for C routine: a0 = argc, a1 = argv
   __ mov(a0, s0);
   __ mov(a1, s1);
+
+  // We are calling compiled C/C++ code. a0 and a1 hold our two arguments. We
+  // also need to reserve the 4 argument slots on the stack.
 
   // TODO(MIPS): As of 26May10, Arm code has frame-alignment checks
   // and modification code here.
 
-  // We are calling compiled C/C++ code. a0 and a1 hold our two arguments. We
-  // also need the argument slots.
-  __ jalr(s2);  // Use delay slot for sp adjustment.
-  __ addiu(sp, sp, -StandardFrameConstants::kCArgsSlotsSize);
-  __ addiu(sp, sp, StandardFrameConstants::kCArgsSlotsSize);
+  // The mips __ EnterExitFrame(), which is called in CEntryStub::Generate,
+  // does stack alignment to activation_frame_alignment. In this routine,
+  // that alignment must be preserved. We do need to push one kPointerSize
+  // value (below), plus the argument slots. See comments, caveats in
+  // MacroAssembler::AlignStack() function.
+#if defined(V8_HOST_ARCH_MIPS)
+  int activation_frame_alignment = OS::ActivationFrameAlignment();
+#else  // !defined(V8_HOST_ARCH_MIPS)
+  int activation_frame_alignment = 2 * kPointerSize;
+#endif  // defined(V8_HOST_ARCH_MIPS)
+
+  int stack_adjustment = (StandardFrameConstants::kCArgsSlotsSize
+                       + kPointerSize
+                       + (activation_frame_alignment - 1))
+                       & ~(activation_frame_alignment - 1);
+
+  // From arm version of this function:
+  // TODO(1242173): To let the GC traverse the return address of the exit
+  // frames, we need to know where the return address is. Right now,
+  // we push it on the stack to be able to find it again, but we never
+  // restore from it in case of changes, which makes it impossible to
+  // support moving the C entry code stub. This should be fixed, but currently
+  // this is OK because the CEntryStub gets generated so early in the V8 boot
+  // sequence that it is not moving ever.
+
+  // This branch-and-link sequence is needed to find the current PC on mips,
+  // saved to the ra register.
+  // Use masm-> here instead of the double-underscore macro since extra
+  // coverage code can interfere with the proper calculation of ra.
+  Label find_ra;
+  masm->bal(&find_ra);
+  masm->nop();  // Branch delay slot nop.
+  masm->bind(&find_ra);
+
+  // Adjust the value in ra to point to the correct return location, 2nd
+  // instruction past the real call into C code (the jalr(s2)), and push it.
+  // This is the return address of the exit frame.
+  masm->Addu(ra, ra, 20);  // 5 instructions is 20 bytes.
+  masm->addiu(sp, sp, -(stack_adjustment));
+  masm->sw(ra, MemOperand(sp, stack_adjustment - kPointerSize));
+
+  // Call the C routine.
+  masm->jalr(s2);  // If ra computed correctly above, this could be jr().
+  masm->nop();    // Branch delay slot nop.
+
+  // Restore stack (remove arg slots and extra parameter).
+  masm->addiu(sp, sp, stack_adjustment);
+
 
   if (always_allocate) {
     // It's okay to clobber a2 and a3 here. v0 & v1 contain result.
@@ -7385,7 +7430,6 @@ void StringCompareStub::GenerateCompareFlatAsciiStrings(MacroAssembler* masm,
   // set min_length to the smaller of the two string lengths.
   __ slt(scratch3, scratch1, scratch2);
   __ movz(min_length, scratch2, scratch3);
-  // __ Branch(&compare_lengths, eq, min_length, Operand(zero_reg));
 
   // Setup registers left and right to point to character[0].
   __ Addu(left, left, Operand(SeqAsciiString::kHeaderSize - kHeapObjectTag));
@@ -7463,7 +7507,7 @@ void StringCompareStub::Generate(MacroAssembler* masm) {
   // Compare flat ascii strings natively. Remove arguments from stack first.
   __ IncrementCounter(&Counters::string_compare_native, 1, a2, a3);
   __ Addu(sp, sp, Operand(2 * kPointerSize));
-  GenerateCompareFlatAsciiStrings(masm, a0, a1, a2, a3, t0, t1);
+  GenerateCompareFlatAsciiStrings(masm, a1, a0, a2, a3, t0, t1);
 
   __ bind(&runtime);
   __ TailCallRuntime(Runtime::kStringCompare, 2, 1);
