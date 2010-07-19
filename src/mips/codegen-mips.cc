@@ -177,92 +177,102 @@ void CodeGenerator::Generate(CompilationInfo* info) {
     }
 #endif
 
-    // Arm codegen supports secondary mode, which mips doesn't support yet.
-    // For now, make sure we're always called as primary.
-    ASSERT(info->mode() == CompilationInfo::PRIMARY);
-    frame_->Enter();
+    if (info->mode() == CompilationInfo::PRIMARY) {
+      frame_->Enter();
 
-    // Allocate space for locals and initialize them.
-    frame_->AllocateStackSlots();
+      // Allocate space for locals and initialize them.
+      frame_->AllocateStackSlots();
 
-    VirtualFrame::SpilledScope spilled_scope;
-    int heap_slots = scope()->num_heap_slots();
-    if (heap_slots > 0) {
-      // Allocate local context.
-      // Get outer context and create a new context based on it.
-      __ lw(a0, frame_->Function());
-      frame_->EmitPush(a0);
-      frame_->CallRuntime(Runtime::kNewContext, 1);  // v0 holds the result
+      VirtualFrame::SpilledScope spilled_scope;
+      int heap_slots = scope()->num_heap_slots();
+      if (heap_slots > 0) {
+        // Allocate local context.
+        // Get outer context and create a new context based on it.
+        __ lw(a0, frame_->Function());
+        frame_->EmitPush(a0);
+        frame_->CallRuntime(Runtime::kNewContext, 1);  // v0 holds the result
 
 #ifdef DEBUG
-      JumpTarget verified_true;
-      verified_true.Branch(eq, v0, Operand(cp), no_hint);
-      __ stop("NewContext: v0 is expected to be the same as cp");
-      verified_true.Bind();
+        JumpTarget verified_true;
+        verified_true.Branch(eq, v0, Operand(cp), no_hint);
+        __ stop("NewContext: v0 is expected to be the same as cp");
+        verified_true.Bind();
 #endif
-      // Update context local.
-      __ sw(cp, frame_->Context());
-    }
+        // Update context local.
+        __ sw(cp, frame_->Context());
+      }
 
-    {
-      Comment cmnt2(masm_, "[ copy context parameters into .context");
+      {
+        Comment cmnt2(masm_, "[ copy context parameters into .context");
 
-      // Note that iteration order is relevant here! If we have the same
-      // parameter twice (e.g., function (x, y, x)), and that parameter
-      // needs to be copied into the context, it must be the last argument
-      // passed to the parameter that needs to be copied. This is a rare
-      // case so we don't check for it, instead we rely on the copying
-      // order: such a parameter is copied repeatedly into the same
-      // context location and thus the last value is what is seen inside
-      // the function.
-      for (int i = 0; i < scope()->num_parameters(); i++) {
-        Variable* par = scope()->parameter(i);
-        Slot* slot = par->slot();
-        if (slot != NULL && slot->type() == Slot::CONTEXT) {
-          ASSERT(!scope()->is_global_scope());  // no parameters in global scope
-          __ lw(a1, frame_->ParameterAt(i));
-          // Loads a2 with context; used below in RecordWrite.
-          __ sw(a1, SlotOperand(slot, a2));
-          // Load the offset into a3.
-          int slot_offset =
-              FixedArray::kHeaderSize + slot->index() * kPointerSize;
-          __ li(a3, Operand(slot_offset));
-          __ RecordWrite(a2, a3, a1);
+        // Note that iteration order is relevant here! If we have the same
+        // parameter twice (e.g., function (x, y, x)), and that parameter
+        // needs to be copied into the context, it must be the last argument
+        // passed to the parameter that needs to be copied. This is a rare
+        // case so we don't check for it, instead we rely on the copying
+        // order: such a parameter is copied repeatedly into the same
+        // context location and thus the last value is what is seen inside
+        // the function.
+        for (int i = 0; i < scope()->num_parameters(); i++) {
+          Variable* par = scope()->parameter(i);
+          Slot* slot = par->slot();
+          if (slot != NULL && slot->type() == Slot::CONTEXT) {
+            ASSERT(!scope()->is_global_scope());  // no parameters in global scope
+            __ lw(a1, frame_->ParameterAt(i));
+            // Loads a2 with context; used below in RecordWrite.
+            __ sw(a1, SlotOperand(slot, a2));
+            // Load the offset into a3.
+            int slot_offset =
+                FixedArray::kHeaderSize + slot->index() * kPointerSize;
+            __ li(a3, Operand(slot_offset));
+            __ RecordWrite(a2, a3, a1);
+          }
         }
       }
-    }
 
-    // Store the arguments object.  This must happen after context
-    // initialization because the arguments object may be stored in the
-    // context.
-    if (scope()->arguments() != NULL) {
-        Comment cmnt(masm_, "[ allocate arguments object");
-        ASSERT(scope()->arguments_shadow() != NULL);
-        Variable* arguments = scope()->arguments()->var();
-        Variable* shadow = scope()->arguments_shadow()->var();
-        ASSERT(arguments != NULL && arguments->slot() != NULL);
-        ASSERT(shadow != NULL && shadow->slot() != NULL);
-        ArgumentsAccessStub stub(ArgumentsAccessStub::NEW_OBJECT);
-        __ lw(a2, frame_->Function());
-        // The receiver is below the arguments, the return address, and the
-        // frame pointer on the stack.
-        const int kReceiverDisplacement = 2 + scope()->num_parameters();
-        __ Addu(a1, fp, Operand(kReceiverDisplacement * kPointerSize));
-        __ li(a0, Operand(Smi::FromInt(scope()->num_parameters())));
-        frame_->Adjust(3);
-        __ MultiPush(a0.bit() | a1.bit() | a2.bit());
-        frame_->CallStub(&stub, 3);
-        frame_->EmitPush(v0);
-        StoreToSlot(arguments->slot(), NOT_CONST_INIT);
-        StoreToSlot(shadow->slot(), NOT_CONST_INIT);
-        frame_->Drop();  // Value is no longer needed.
-    }
+      // Store the arguments object.  This must happen after context
+      // initialization because the arguments object may be stored in the
+      // context.
+      if (scope()->arguments() != NULL) {
+          Comment cmnt(masm_, "[ allocate arguments object");
+          ASSERT(scope()->arguments_shadow() != NULL);
+          Variable* arguments = scope()->arguments()->var();
+          Variable* shadow = scope()->arguments_shadow()->var();
+          ASSERT(arguments != NULL && arguments->slot() != NULL);
+          ASSERT(shadow != NULL && shadow->slot() != NULL);
+          ArgumentsAccessStub stub(ArgumentsAccessStub::NEW_OBJECT);
+          __ lw(a2, frame_->Function());
+          // The receiver is below the arguments, the return address, and the
+          // frame pointer on the stack.
+          const int kReceiverDisplacement = 2 + scope()->num_parameters();
+          __ Addu(a1, fp, Operand(kReceiverDisplacement * kPointerSize));
+          __ li(a0, Operand(Smi::FromInt(scope()->num_parameters())));
+          frame_->Adjust(3);
+          __ MultiPush(a0.bit() | a1.bit() | a2.bit());
+          frame_->CallStub(&stub, 3);
+          frame_->EmitPush(v0);
+          StoreToSlot(arguments->slot(), NOT_CONST_INIT);
+          StoreToSlot(shadow->slot(), NOT_CONST_INIT);
+          frame_->Drop();  // Value is no longer needed.
+      }
 
-    // Initialize ThisFunction reference if present.
-    if (scope()->is_function_scope() && scope()->function() != NULL) {
-      __ li(t0, Operand(Factory::the_hole_value()));
-      frame_->EmitPush(t0);
-      StoreToSlot(scope()->function()->slot(), NOT_CONST_INIT);
+      // Initialize ThisFunction reference if present.
+      if (scope()->is_function_scope() && scope()->function() != NULL) {
+        __ li(t0, Operand(Factory::the_hole_value()));
+        frame_->EmitPush(t0);
+        StoreToSlot(scope()->function()->slot(), NOT_CONST_INIT);
+      }
+    } else {
+      // When used as the secondary compiler for splitting, a1, cp,
+      // fp, and ra have been pushed on the stack.  Adjust the virtual
+      // frame to match this state.
+      frame_->Adjust(4);
+
+      // Bind all the bailout labels to the beginning of the function.
+      List<CompilationInfo::Bailout*>* bailouts = info->bailouts();
+      for (int i = 0; i < bailouts->length(); i++) {
+        __ bind(bailouts->at(i)->label());
+      }
     }
 
     // Initialize the function return target after the locals are set

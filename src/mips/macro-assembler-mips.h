@@ -214,6 +214,15 @@ DECLARE_NOTARGET_PROTOTYPE(Ret)
                               Register scratch,
                               Label* miss);
 
+  // Check if the map of an object is equal to a specified map and
+  // branch to label if not. Skip the smi check if not required
+  // (object is known to be a heap object)
+  void CheckMap(Register obj,
+                Register scratch,
+                Handle<Map> map,
+                Label* fail,
+                bool is_heap_object);
+
 
   // ---------------------------------------------------------------------------
   // Allocation support
