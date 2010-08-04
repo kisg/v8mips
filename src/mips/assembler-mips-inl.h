@@ -38,6 +38,7 @@
 
 #include "mips/assembler-mips.h"
 #include "cpu.h"
+#include "debug.h"
 
 
 namespace v8 {
@@ -107,6 +108,11 @@ Address RelocInfo::target_address() {
 Address RelocInfo::target_address_address() {
   ASSERT(IsCodeTarget(rmode_) || rmode_ == RUNTIME_ENTRY);
   return reinterpret_cast<Address>(pc_);
+}
+
+
+int RelocInfo::target_address_size() {
+  return Assembler::kExternalTargetSize;
 }
 
 
@@ -192,13 +198,36 @@ bool RelocInfo::IsPatchedReturnSequence() {
 //   PrintF("%s - %d - %s : Checking for jal(r)",
 //       __FILE__, __LINE__, __func__);
 // #endif
-  //return 
+  //return
   bool prs = (((current_instr & 0xffff0000) == 0x3c010000) &&   // plind -- really UGLY HACK .......
           ((third_instr & kOpcodeMask) == SPECIAL) &&
           ((third_instr & kFunctionFieldMask) == JALR));
         // PrintF("%08x, %08x : Checking for patched ret sequence: lui, ori, jalr: %d\n",
         //   current_instr, third_instr, prs);
         return prs;
+}
+
+
+void RelocInfo::Visit(ObjectVisitor* visitor) {
+  RelocInfo::Mode mode = rmode();
+  if (mode == RelocInfo::EMBEDDED_OBJECT) {
+    // RelocInfo is needed when pointer must be updated, such as
+    // UpdatingVisitor in mark-compact.cc. It ignored by visitors
+    // that do not need it.
+    visitor->VisitPointer(target_object_address(), this);
+  } else if (RelocInfo::IsCodeTarget(mode)) {
+    visitor->VisitCodeTarget(this);
+  } else if (mode == RelocInfo::EXTERNAL_REFERENCE) {
+    visitor->VisitExternalReference(target_reference_address());
+#ifdef ENABLE_DEBUGGER_SUPPORT
+  } else if (Debug::has_break_points() &&
+             RelocInfo::IsJSReturn(mode) &&
+             IsPatchedReturnSequence()) {
+    visitor->VisitDebugTarget(this);
+#endif
+  } else if (mode == RelocInfo::RUNTIME_ENTRY) {
+    visitor->VisitRuntimeEntry(this);
+  }
 }
 
 
