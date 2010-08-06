@@ -206,6 +206,15 @@ Register ToRegister(int num) {
 
 const int RelocInfo::kApplyMask = 0;
 
+
+bool RelocInfo::IsCodedSpecially() {
+  // The deserializer needs to know whether a pointer is specially coded.  Being
+  // specially coded on MIPS means that it is a lui/ori instruction, and that is
+  // always the case inside code objects.
+  return true;
+}
+
+
 // Patch the code at the current address with the supplied instructions.
 void RelocInfo::PatchCode(byte* instructions, int instruction_count) {
   Instr* pc = reinterpret_cast<Instr*>(pc_);
@@ -292,6 +301,10 @@ Assembler::Assembler(void* buffer, int buffer_size) {
   current_position_ = RelocInfo::kNoPosition;
   written_statement_position_ = current_statement_position_;
   written_position_ = current_position_;
+
+  last_trampoline_pool_end_ = 0;
+  no_trampoline_pool_before_ = 0;
+  next_buffer_check_ = kMaxBranchOffset - kTrampolineSize;
 }
 
 
@@ -357,7 +370,12 @@ int Assembler::target_at(int32_t pos) {
   Instr instr = instr_at(pos);
   if ((instr & ~kImm16Mask) == 0) {
     // Emitted label constant, not part of a branch.
-    return instr - (Code::kHeaderSize - kHeapObjectTag);
+    if (instr == 0) {
+       return kEndOfChain;
+     } else {
+       int32_t imm18 =((instr & static_cast<int32_t>(kImm16Mask)) << 16) >> 14;
+       return (imm18 + pos);
+     }
   }
   // Check we have a branch instruction.
   ASSERT(is_branch(instr));
@@ -425,7 +443,25 @@ void Assembler::bind_to(Label* L, int pos) {
   ASSERT(0 <= pos && pos <= pc_offset());  // must have a valid binding position
   while (L->is_linked()) {
     int32_t fixup_pos = L->pos();
+    int32_t dist = pos - fixup_pos;
     next(L);  // call next before overwriting link with target at fixup_pos
+    if (dist > kMaxBranchOffset) {
+      do {
+        int32_t trampoline_pos = get_trampoline_entry(fixup_pos);
+        ASSERT((trampoline_pos - fixup_pos) <= kMaxBranchOffset);
+        target_at_put(fixup_pos, trampoline_pos);
+        fixup_pos = trampoline_pos;
+        dist = pos - fixup_pos;
+      } while (dist > kMaxBranchOffset);
+    } else if (dist < -kMaxBranchOffset) {
+      do {
+        int32_t trampoline_pos = get_trampoline_entry(fixup_pos, false);
+        ASSERT((trampoline_pos - fixup_pos) >= -kMaxBranchOffset);
+        target_at_put(fixup_pos, trampoline_pos);
+        fixup_pos = trampoline_pos;
+        dist = pos - fixup_pos;
+      } while (dist < -kMaxBranchOffset);
+    };
     target_at_put(fixup_pos, pos);
   }
   L->bind_to(pos);
@@ -482,12 +518,11 @@ void Assembler::next(Label* L) {
 // space.  There is no guarantee that the relocated location can be similarly
 // encoded.
 bool Assembler::MustUseReg(RelocInfo::Mode rmode) {
-  if (rmode == RelocInfo::EXTERNAL_REFERENCE) {
-    return Serializer::enabled();
-  } else if (rmode == RelocInfo::NONE) {
+  if (rmode == RelocInfo::NONE) {
     return false;
+  } else {
+    return true;
   }
-  return true;
 }
 
 
@@ -580,19 +615,107 @@ void Assembler::GenInstrImmediate(Opcode opcode,
 // Registers are in the order of the instruction encoding, from left to right.
 void Assembler::GenInstrJump(Opcode opcode,
                               uint32_t address) {
+  BlockTrampolinePoolFor(2);
   ASSERT(is_uint26(address));
   Instr instr = opcode | address;
   emit(instr);
 }
 
+// Returns the next free label entry from the next trampoline pool.
+int32_t Assembler::get_label_entry(int32_t pos, bool next_pool) {
+  int trampoline_count = trampolines_.length();
+  int32_t label_entry = 0;
+  ASSERT(trampoline_count > 0);
+
+  if (next_pool) {
+    for (int i = 0; i < trampoline_count; i++) {
+      if (trampolines_[i].start() > pos) {
+       label_entry = trampolines_[i].take_label();
+       break;
+      }
+    }
+  } else {  //  Caller needs a label entry from the previous pool.
+    for (int i = trampoline_count-1; i >= 0; i--) {
+      if (trampolines_[i].end() < pos) {
+       label_entry = trampolines_[i].take_label();
+       break;
+      }
+    }
+  }
+  return label_entry;
+}
+
+// Returns the next free trampoline entry from the next trampoline pool.
+int32_t Assembler::get_trampoline_entry(int32_t pos, bool next_pool) {
+  int trampoline_count = trampolines_.length();
+  int32_t trampoline_entry = 0;
+  ASSERT(trampoline_count > 0);
+
+  if (next_pool) {
+    for (int i = 0; i < trampoline_count; i++) {
+      if (trampolines_[i].start() > pos) {
+       trampoline_entry = trampolines_[i].take_slot();
+       break;
+      }
+    }
+  } else {  //  Caller needs a trampoline entry from the previous pool.
+    for (int i = trampoline_count-1; i >= 0; i--) {
+      if (trampolines_[i].end() < pos) {
+       trampoline_entry = trampolines_[i].take_slot();
+       break;
+      }
+    }
+  }
+  return trampoline_entry;
+}
 
 int32_t Assembler::branch_offset(Label* L, bool jump_elimination_allowed) {
   int32_t target_pos;
+  int32_t pc_offset_v = pc_offset();
+
   if (L->is_bound()) {
     target_pos = L->pos();
+    int32_t dist = pc_offset_v - target_pos;
+    if (dist > kMaxBranchOffset) {
+      do {
+        int32_t trampoline_pos = get_trampoline_entry(target_pos);
+        ASSERT((trampoline_pos - target_pos) > 0);
+        ASSERT((trampoline_pos - target_pos) <= kMaxBranchOffset);
+        target_at_put(trampoline_pos, target_pos);
+        target_pos = trampoline_pos;
+        dist = pc_offset_v - target_pos;
+      } while (dist > kMaxBranchOffset);
+    } else if (dist < -kMaxBranchOffset) {
+      do {
+        int32_t trampoline_pos = get_trampoline_entry(target_pos, false);
+        ASSERT((target_pos - trampoline_pos) > 0);
+        ASSERT((target_pos - trampoline_pos) <= kMaxBranchOffset);
+        target_at_put(trampoline_pos, target_pos);
+        target_pos = trampoline_pos;
+        dist = pc_offset_v - target_pos;
+      } while (dist < -kMaxBranchOffset);
+    }
   } else {
     if (L->is_linked()) {
       target_pos = L->pos();  // L's link
+      int32_t dist = pc_offset_v - target_pos;
+      if (dist > kMaxBranchOffset) {
+        do {
+          int32_t label_pos = get_label_entry(target_pos);
+          ASSERT((label_pos - target_pos) < kMaxBranchOffset);
+          label_at_put(L, label_pos);
+          target_pos = label_pos;
+          dist = pc_offset_v - target_pos;
+        } while (dist > kMaxBranchOffset);
+      } else if (dist < -kMaxBranchOffset) {
+        do {
+          int32_t label_pos = get_label_entry(target_pos, false);
+          ASSERT((label_pos - target_pos) > -kMaxBranchOffset);
+          label_at_put(L, label_pos);
+          target_pos = label_pos;
+          dist = pc_offset_v - target_pos;
+        } while (dist < -kMaxBranchOffset);
+      }
       L->link_to(pc_offset());
     } else {
       L->link_to(pc_offset());
@@ -601,6 +724,9 @@ int32_t Assembler::branch_offset(Label* L, bool jump_elimination_allowed) {
   }
 
   int32_t offset = target_pos - (pc_offset() + kBranchPCOffset);
+  ASSERT((offset & 3) == 0);
+  ASSERT(is_int16(offset >> 2));
+
   return offset;
 }
 
@@ -609,14 +735,20 @@ void Assembler::label_at_put(Label* L, int at_offset) {
   int target_pos;
   if (L->is_bound()) {
     target_pos = L->pos();
+    instr_at_put(at_offset, target_pos + (Code::kHeaderSize - kHeapObjectTag));
   } else {
     if (L->is_linked()) {
       target_pos = L->pos();  // L's link
+      int32_t imm18 = target_pos - at_offset;
+      ASSERT((imm18 & 3) == 0);
+      int32_t imm16 = imm18 >> 2;
+      ASSERT(is_int16(imm16));
+      instr_at_put(at_offset, (imm16 & kImm16Mask));
     } else {
       target_pos = kEndOfChain;
+      instr_at_put(at_offset, 0);
     }
     L->link_to(at_offset);
-    instr_at_put(at_offset, target_pos + (Code::kHeaderSize - kHeapObjectTag));
   }
 }
 
@@ -635,43 +767,51 @@ void Assembler::bal(int16_t offset) {
 
 
 void Assembler::beq(Register rs, Register rt, int16_t offset) {
+  BlockTrampolinePoolFor(2);
   GenInstrImmediate(BEQ, rs, rt, offset);
 }
 
 
 void Assembler::bgez(Register rs, int16_t offset) {
+  BlockTrampolinePoolFor(2);
   GenInstrImmediate(REGIMM, rs, BGEZ, offset);
 }
 
 
 void Assembler::bgezal(Register rs, int16_t offset) {
+  BlockTrampolinePoolFor(2);
   WriteRecordedPositions();
   GenInstrImmediate(REGIMM, rs, BGEZAL, offset);
 }
 
 
 void Assembler::bgtz(Register rs, int16_t offset) {
+  BlockTrampolinePoolFor(2);
   GenInstrImmediate(BGTZ, rs, zero_reg, offset);
 }
 
 
 void Assembler::blez(Register rs, int16_t offset) {
+  BlockTrampolinePoolFor(2);
   GenInstrImmediate(BLEZ, rs, zero_reg, offset);
 }
 
 
 void Assembler::bltz(Register rs, int16_t offset) {
+  BlockTrampolinePoolFor(2);
   GenInstrImmediate(REGIMM, rs, BLTZ, offset);
 }
 
 
 void Assembler::bltzal(Register rs, int16_t offset) {
+  BlockTrampolinePoolFor(2);
   WriteRecordedPositions();
   GenInstrImmediate(REGIMM, rs, BLTZAL, offset);
 }
 
 
 void Assembler::bne(Register rs, Register rt, int16_t offset) {
+  BlockTrampolinePoolFor(2);
   GenInstrImmediate(BNE, rs, rt, offset);
 }
 
@@ -683,6 +823,7 @@ void Assembler::j(int32_t target) {
 
 
 void Assembler::jr(Register rs) {
+  BlockTrampolinePoolFor(2);
   if (rs.is(ra)) {
     WriteRecordedPositions();
   }
@@ -698,6 +839,7 @@ void Assembler::jal(int32_t target) {
 
 
 void Assembler::jalr(Register rs, Register rd) {
+  BlockTrampolinePoolFor(2);
   WriteRecordedPositions();
   GenInstrRegister(SPECIAL, rs, zero_reg, rd, 0, JALR);
 }
@@ -1304,12 +1446,65 @@ void Assembler::RecordRelocInfo(RelocInfo::Mode rmode, intptr_t data) {
   }
 }
 
+void Assembler::BlockTrampolinePoolFor(int instructions) {
+  BlockTrampolinePoolBefore(pc_offset() + instructions * kInstrSize);
+}
+
+void Assembler::CheckTrampolinePool() {
+  // Calculate the offset of the next check.
+  next_buffer_check_ = pc_offset() + kCheckConstInterval;
+
+  int dist = pc_offset() - last_trampoline_pool_end_;
+
+  if (dist <= kMaxDistBetweenPools) {
+    return;
+  }
+
+  // Some small sequences of instructions must not be broken up by the
+  // insertion of a trampoline pool; such sequences are protected by setting
+  // no_trampoline_pool_before_, which is checked here. Recursive calls to
+  // CheckTrampolinePool are blocked by no_trampoline_pool_before_ as well.
+  if (pc_offset() < no_trampoline_pool_before_) {
+    // Emission is currently blocked; make sure we try again as soon as
+    // possible.
+    next_buffer_check_ = no_trampoline_pool_before_;
+    return;
+  }
+
+  // First we emit jump (2 instructions), then we emit trampoline pool.
+  BlockTrampolinePoolFor(2 + kSlotsPerTrampoline*2 + kLabelsPerTrampoline + 1);
+  // Don't bother to check for the emit calls below.
+  next_buffer_check_ = no_trampoline_pool_before_;
+
+  Label after_pool;
+  b(&after_pool);
+  nop();
+
+  int pool_start = pc_offset();
+  for (int i = 0; i < kSlotsPerTrampoline; i++) {
+    b(&after_pool);
+    nop();
+  }
+  for (int i = 0; i < kLabelsPerTrampoline; i++) {
+    emit(0);
+  }
+  last_trampoline_pool_end_ = pc_offset() - kInstrSize;
+  bind(&after_pool);
+  trampolines_.Add(Trampoline(pool_start,
+                              kSlotsPerTrampoline,
+                              kLabelsPerTrampoline));
+
+  // Since a trampoline pool was just emitted, move the check offset forward by
+  // the standard interval.
+  next_buffer_check_ = last_trampoline_pool_end_ + kMaxDistBetweenPools;
+  return;
+}
 
 Address Assembler::target_address_at(Address pc) {
   Instr instr1 = instr_at(pc);
   Instr instr2 = instr_at(pc + kInstrSize);
   // Check we have 2 instructions generated by li.
-  
+
   // if ( ! (((instr1 & kOpcodeMask) == LUI && (instr2 & kOpcodeMask) == ORI) ||
   //        ((instr1 == nopInstr) && ((instr2 & kOpcodeMask) == ADDI ||
   //                           (instr2 & kOpcodeMask) == ORI ||
@@ -1317,7 +1512,7 @@ Address Assembler::target_address_at(Address pc) {
   //   PrintF("target_address_at(): adr: %08x i1: %08x, i2: %08x\n",
   //           pc, instr1, instr2);
   // }
-  
+
   ASSERT(((instr1 & kOpcodeMask) == LUI && (instr2 & kOpcodeMask) == ORI) ||
          ((instr1 == nopInstr) && ((instr2 & kOpcodeMask) == ADDI ||
                             (instr2 & kOpcodeMask) == ORI ||

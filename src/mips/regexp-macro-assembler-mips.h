@@ -116,10 +116,10 @@ class RegExpMacroAssemblerMIPS: public NativeRegExpMacroAssembler {
   static const int kFramePointer = 0;
 
   // Above the frame pointer - Stored registers and stack passed parameters.
-  // Register 4..11.
+  // Registers s0 to s7, fp, and ra.
   static const int kStoredRegisters = kFramePointer;
   // Return address (stored from link register, read into pc on return).
-  static const int kReturnAddress = kStoredRegisters + 8 * kPointerSize;
+  static const int kReturnAddress = kStoredRegisters + 9 * kPointerSize;
   // Stack frame header.
   static const int kStackFrameHeader = kReturnAddress + kPointerSize;
   // Stack parameters placed by caller.
