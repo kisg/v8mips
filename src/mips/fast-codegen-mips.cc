@@ -61,8 +61,8 @@ void FastCodeGenerator::EmitGlobalVariableLoad(Handle<Object> cell) {
   __ lw(destination(),
          FieldMemOperand(destination(), JSGlobalPropertyCell::kValueOffset));
   if (FLAG_debug_code) {
-    __ li(ip, Operand(Factory::the_hole_value()));
-    __ Check(ne, "DontDelete cells can't contain the hole", destination(), Operand(ip));
+    __ li(at, Operand(Factory::the_hole_value()));
+    __ Check(ne, "DontDelete cells can't contain the hole", destination(), Operand(at));
   }
 
   // The loaded value is not known to be a smi.

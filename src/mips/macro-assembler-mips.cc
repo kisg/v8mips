@@ -312,8 +312,8 @@ void MacroAssembler::CheckMap(Register obj,
     BranchOnSmi(obj, fail);
   }
   lw(scratch, FieldMemOperand(obj, HeapObject::kMapOffset));
-  li(ip, Operand(map));
-  Branch(fail, ne, scratch, Operand(ip));
+  li(at, Operand(map));
+  Branch(fail, ne, scratch, Operand(at));
 }
 
 void MacroAssembler::CheckAccessGlobalProxy(Register holder_reg,
