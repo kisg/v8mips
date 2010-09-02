@@ -5025,17 +5025,17 @@ static void EmitTwoNonNanDoubleComparison(MacroAssembler* masm, Condition cc) {
   if (!CpuFeatures::IsSupported(FPU)) {
     __ Push(ra);
     __ PrepareCallCFunction(4, t4);  // Two doubles count as 4 arguments.
-#if(defined(__mips_hard_float) && __mips_hard_float != 0)
-    // We are not using MIPS FPU instructions, and parameters for the run-time
-    // function call are prepaired in a0-a3 registers, but function we are
-    // calling is compiled with hard-float flag and expecting hard float ABI
-    // (parameters in f12/f14 registers). We need to copy parameters from a0-a3
-    // registers to f12/f14 register pairs.
-    __ mtc1(a0, f12);
-    __ mtc1(a1, f13);
-    __ mtc1(a2, f14);
-    __ mtc1(a3, f15);
-#endif
+    if(!IsMipsSoftFloatABI){
+      // We are not using MIPS FPU instructions, and parameters for the run-time
+      // function call are prepaired in a0-a3 registers, but function we are
+      // calling is compiled with hard-float flag and expecting hard float ABI
+      // (parameters in f12/f14 registers). We need to copy parameters from a0-a3
+      // registers to f12/f14 register pairs.
+      __ mtc1(a0, f12);
+      __ mtc1(a1, f13);
+      __ mtc1(a2, f14);
+      __ mtc1(a3, f15);
+    }
     __ CallCFunction(ExternalReference::compare_doubles(), 4);
     __ Pop(ra);  // Because this function returns int, result is in v0.
     __ Ret();
@@ -6219,30 +6219,30 @@ static void HandleBinaryOpSlowCases(MacroAssembler* masm,
       __ Push(ra);
       __ Push(t0);
       __ PrepareCallCFunction(4, t1);  // Two doubles count as 4 arguments.
-#if(defined(__mips_soft_float) && __mips_soft_float != 0)
-      // We are using MIPS FPU instructions, and parameters for the run-time
-      // function call are prepared in f12/f14 register pairs, but function
-      // we are calling is compiled with soft-float flag and expecting soft 
-      // float ABI (parameters in a0-a3 registers). We need to copy parameters
-      // from f12/f14 register pairs to a0-a3 registers.
-      __ mfc1(a0, f12);
-      __ mfc1(a1, f13);
-      __ mfc1(a2, f14);
-      __ mfc1(a3, f15);
-#endif
+      if(IsMipsSoftFloatABI){
+        // We are using MIPS FPU instructions, and parameters for the run-time
+        // function call are prepared in f12/f14 register pairs, but function
+        // we are calling is compiled with soft-float flag and expecting soft 
+        // float ABI (parameters in a0-a3 registers). We need to copy parameters
+        // from f12/f14 register pairs to a0-a3 registers.
+        __ mfc1(a0, f12);
+        __ mfc1(a1, f13);
+        __ mfc1(a2, f14);
+        __ mfc1(a3, f15);
+      }
       __ CallCFunction(ExternalReference::double_fp_operation(operation), 4);
       __ Pop(t0);  // Address of heap number.
       __ Pop(ra);
-#if(defined(__mips_soft_float) && __mips_soft_float != 0)
-      // Store answer in the overwritable heap number.
-      // Double returned is stored in registers v0 and v1 (function we called
-      // is compiled with soft-float flag and uses soft-float ABI).
-      __ sw(v0, FieldMemOperand(t0, HeapNumber::kValueOffset));
-      __ sw(v1, FieldMemOperand(t0, HeapNumber::kValueOffset + 4));
-      __ mov(v0, t0);  // Return object ptr to caller.
-      __ Ret();
-      return;
-#endif
+      if(IsMipsSoftFloatABI){
+        // Store answer in the overwritable heap number.
+        // Double returned is stored in registers v0 and v1 (function we called
+        // is compiled with soft-float flag and uses soft-float ABI).
+        __ sw(v0, FieldMemOperand(t0, HeapNumber::kValueOffset));
+        __ sw(v1, FieldMemOperand(t0, HeapNumber::kValueOffset + 4));
+        __ mov(v0, t0);  // Return object ptr to caller.
+        __ Ret();
+        return;
+      }
     } else {
       UNREACHABLE();
     }
@@ -6265,30 +6265,32 @@ static void HandleBinaryOpSlowCases(MacroAssembler* masm,
 
   __ PrepareCallCFunction(4, t1);  // Two doubles count as 4 arguments.
   // Call C routine that may not cause GC or other trouble.
-#if(defined(__mips_hard_float) && __mips_hard_float != 0)
-  if(!use_fp_registers){
-    // We are not using MIPS FPU instructions, and parameters for the run-time
-    // function call are prepared in a0-a3 registers, but the function we are
-    // calling is compiled with hard-float flag and expecting hard float ABI
-    // (parameters in f12/f14 registers). We need to copy parameters from a0-a3
-    // registers to f12/f14 register pairs.
-    __ mtc1(a0, f12);
-    __ mtc1(a1, f13);
-    __ mtc1(a2, f14);
-    __ mtc1(a3, f15);
+  if(!IsMipsSoftFloatABI){
+    if(!use_fp_registers){
+      // We are not using MIPS FPU instructions, and parameters for the run-time
+      // function call are prepared in a0-a3 registers, but the function we are
+      // calling is compiled with hard-float flag and expecting hard float ABI
+      // (parameters in f12/f14 registers). We need to copy parameters from a0-a3
+      // registers to f12/f14 register pairs.
+      __ mtc1(a0, f12);
+      __ mtc1(a1, f13);
+      __ mtc1(a2, f14);
+      __ mtc1(a3, f15);
+    }
   }
-#endif
+
   __ CallCFunction(ExternalReference::double_fp_operation(operation), 4);
-#if(defined(__mips_hard_float) && __mips_hard_float != 0)
-  if(!use_fp_registers){
-    // Returned double value is stored in registers f0 and f1 (function we 
-    // called is compiled with hard-float flag and uses hard-float ABI). Return
-    // value in the case when we are not using MIPS FPU instructions has to be 
-    // placed in v0/v1, so we need to copy from f0/f1.
-    __ mfc1(v0, f0);
-    __ mfc1(v1, f1);
+
+  if(!IsMipsSoftFloatABI){
+    if(!use_fp_registers){
+      // Returned double value is stored in registers f0 and f1 (function we 
+      // called is compiled with hard-float flag and uses hard-float ABI). Return
+      // value in the case when we are not using MIPS FPU instructions has to be 
+      // placed in v0/v1, so we need to copy from f0/f1.
+      __ mfc1(v0, f0);
+      __ mfc1(v1, f1);
+    }
   }
-#endif
   __ Pop(t0);  // Address of heap number.
   // Store answer in the overwritable heap number.
 
