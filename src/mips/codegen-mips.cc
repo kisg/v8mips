@@ -177,92 +177,102 @@ void CodeGenerator::Generate(CompilationInfo* info) {
     }
 #endif
 
-    // Arm codegen supports secondary mode, which mips doesn't support yet.
-    // For now, make sure we're always called as primary.
-    ASSERT(info->mode() == CompilationInfo::PRIMARY);
-    frame_->Enter();
+    if (info->mode() == CompilationInfo::PRIMARY) {
+      frame_->Enter();
 
-    // Allocate space for locals and initialize them.
-    frame_->AllocateStackSlots();
+      // Allocate space for locals and initialize them.
+      frame_->AllocateStackSlots();
 
-    VirtualFrame::SpilledScope spilled_scope;
-    int heap_slots = scope()->num_heap_slots();
-    if (heap_slots > 0) {
-      // Allocate local context.
-      // Get outer context and create a new context based on it.
-      __ lw(a0, frame_->Function());
-      frame_->EmitPush(a0);
-      frame_->CallRuntime(Runtime::kNewContext, 1);  // v0 holds the result
+      VirtualFrame::SpilledScope spilled_scope;
+      int heap_slots = scope()->num_heap_slots();
+      if (heap_slots > 0) {
+        // Allocate local context.
+        // Get outer context and create a new context based on it.
+        __ lw(a0, frame_->Function());
+        frame_->EmitPush(a0);
+        frame_->CallRuntime(Runtime::kNewContext, 1);  // v0 holds the result
 
 #ifdef DEBUG
-      JumpTarget verified_true;
-      verified_true.Branch(eq, v0, Operand(cp), no_hint);
-      __ stop("NewContext: v0 is expected to be the same as cp");
-      verified_true.Bind();
+        JumpTarget verified_true;
+        verified_true.Branch(eq, v0, Operand(cp), no_hint);
+        __ stop("NewContext: v0 is expected to be the same as cp");
+        verified_true.Bind();
 #endif
-      // Update context local.
-      __ sw(cp, frame_->Context());
-    }
+        // Update context local.
+        __ sw(cp, frame_->Context());
+      }
 
-    {
-      Comment cmnt2(masm_, "[ copy context parameters into .context");
+      {
+        Comment cmnt2(masm_, "[ copy context parameters into .context");
 
-      // Note that iteration order is relevant here! If we have the same
-      // parameter twice (e.g., function (x, y, x)), and that parameter
-      // needs to be copied into the context, it must be the last argument
-      // passed to the parameter that needs to be copied. This is a rare
-      // case so we don't check for it, instead we rely on the copying
-      // order: such a parameter is copied repeatedly into the same
-      // context location and thus the last value is what is seen inside
-      // the function.
-      for (int i = 0; i < scope()->num_parameters(); i++) {
-        Variable* par = scope()->parameter(i);
-        Slot* slot = par->slot();
-        if (slot != NULL && slot->type() == Slot::CONTEXT) {
-          ASSERT(!scope()->is_global_scope());  // no parameters in global scope
-          __ lw(a1, frame_->ParameterAt(i));
-          // Loads a2 with context; used below in RecordWrite.
-          __ sw(a1, SlotOperand(slot, a2));
-          // Load the offset into a3.
-          int slot_offset =
-              FixedArray::kHeaderSize + slot->index() * kPointerSize;
-          __ li(a3, Operand(slot_offset));
-          __ RecordWrite(a2, a3, a1);
+        // Note that iteration order is relevant here! If we have the same
+        // parameter twice (e.g., function (x, y, x)), and that parameter
+        // needs to be copied into the context, it must be the last argument
+        // passed to the parameter that needs to be copied. This is a rare
+        // case so we don't check for it, instead we rely on the copying
+        // order: such a parameter is copied repeatedly into the same
+        // context location and thus the last value is what is seen inside
+        // the function.
+        for (int i = 0; i < scope()->num_parameters(); i++) {
+          Variable* par = scope()->parameter(i);
+          Slot* slot = par->slot();
+          if (slot != NULL && slot->type() == Slot::CONTEXT) {
+            ASSERT(!scope()->is_global_scope());  // no parameters in global scope
+            __ lw(a1, frame_->ParameterAt(i));
+            // Loads a2 with context; used below in RecordWrite.
+            __ sw(a1, SlotOperand(slot, a2));
+            // Load the offset into a3.
+            int slot_offset =
+                FixedArray::kHeaderSize + slot->index() * kPointerSize;
+            __ li(a3, Operand(slot_offset));
+            __ RecordWrite(a2, a3, a1);
+          }
         }
       }
-    }
 
-    // Store the arguments object.  This must happen after context
-    // initialization because the arguments object may be stored in the
-    // context.
-    if (scope()->arguments() != NULL) {
-        Comment cmnt(masm_, "[ allocate arguments object");
-        ASSERT(scope()->arguments_shadow() != NULL);
-        Variable* arguments = scope()->arguments()->var();
-        Variable* shadow = scope()->arguments_shadow()->var();
-        ASSERT(arguments != NULL && arguments->slot() != NULL);
-        ASSERT(shadow != NULL && shadow->slot() != NULL);
-        ArgumentsAccessStub stub(ArgumentsAccessStub::NEW_OBJECT);
-        __ lw(a2, frame_->Function());
-        // The receiver is below the arguments, the return address, and the
-        // frame pointer on the stack.
-        const int kReceiverDisplacement = 2 + scope()->num_parameters();
-        __ Addu(a1, fp, Operand(kReceiverDisplacement * kPointerSize));
-        __ li(a0, Operand(Smi::FromInt(scope()->num_parameters())));
-        frame_->Adjust(3);
-        __ MultiPush(a0.bit() | a1.bit() | a2.bit());
-        frame_->CallStub(&stub, 3);
-        frame_->EmitPush(v0);
-        StoreToSlot(arguments->slot(), NOT_CONST_INIT);
-        StoreToSlot(shadow->slot(), NOT_CONST_INIT);
-        frame_->Drop();  // Value is no longer needed.
-    }
+      // Store the arguments object.  This must happen after context
+      // initialization because the arguments object may be stored in the
+      // context.
+      if (scope()->arguments() != NULL) {
+          Comment cmnt(masm_, "[ allocate arguments object");
+          ASSERT(scope()->arguments_shadow() != NULL);
+          Variable* arguments = scope()->arguments()->var();
+          Variable* shadow = scope()->arguments_shadow()->var();
+          ASSERT(arguments != NULL && arguments->slot() != NULL);
+          ASSERT(shadow != NULL && shadow->slot() != NULL);
+          ArgumentsAccessStub stub(ArgumentsAccessStub::NEW_OBJECT);
+          __ lw(a2, frame_->Function());
+          // The receiver is below the arguments, the return address, and the
+          // frame pointer on the stack.
+          const int kReceiverDisplacement = 2 + scope()->num_parameters();
+          __ Addu(a1, fp, Operand(kReceiverDisplacement * kPointerSize));
+          __ li(a0, Operand(Smi::FromInt(scope()->num_parameters())));
+          frame_->Adjust(3);
+          __ MultiPush(a0.bit() | a1.bit() | a2.bit());
+          frame_->CallStub(&stub, 3);
+          frame_->EmitPush(v0);
+          StoreToSlot(arguments->slot(), NOT_CONST_INIT);
+          StoreToSlot(shadow->slot(), NOT_CONST_INIT);
+          frame_->Drop();  // Value is no longer needed.
+      }
 
-    // Initialize ThisFunction reference if present.
-    if (scope()->is_function_scope() && scope()->function() != NULL) {
-      __ li(t0, Operand(Factory::the_hole_value()));
-      frame_->EmitPush(t0);
-      StoreToSlot(scope()->function()->slot(), NOT_CONST_INIT);
+      // Initialize ThisFunction reference if present.
+      if (scope()->is_function_scope() && scope()->function() != NULL) {
+        __ li(t0, Operand(Factory::the_hole_value()));
+        frame_->EmitPush(t0);
+        StoreToSlot(scope()->function()->slot(), NOT_CONST_INIT);
+      }
+    } else {
+      // When used as the secondary compiler for splitting, a1, cp,
+      // fp, and ra have been pushed on the stack.  Adjust the virtual
+      // frame to match this state.
+      frame_->Adjust(4);
+
+      // Bind all the bailout labels to the beginning of the function.
+      List<CompilationInfo::Bailout*>* bailouts = info->bailouts();
+      for (int i = 0; i < bailouts->length(); i++) {
+        __ bind(bailouts->at(i)->label());
+      }
     }
 
     // Initialize the function return target after the locals are set
@@ -5015,17 +5025,17 @@ static void EmitTwoNonNanDoubleComparison(MacroAssembler* masm, Condition cc) {
   if (!CpuFeatures::IsSupported(FPU)) {
     __ Push(ra);
     __ PrepareCallCFunction(4, t4);  // Two doubles count as 4 arguments.
-#if(defined(__mips_hard_float) && __mips_hard_float != 0)
-    // We are not using MIPS FPU instructions, and parameters for the run-time
-    // function call are prepaired in a0-a3 registers, but function we are
-    // calling is compiled with hard-float flag and expecting hard float ABI
-    // (parameters in f12/f14 registers). We need to copy parameters from a0-a3
-    // registers to f12/f14 register pairs.
-    __ mtc1(a0, f12);
-    __ mtc1(a1, f13);
-    __ mtc1(a2, f14);
-    __ mtc1(a3, f15);
-#endif
+    if(!IsMipsSoftFloatABI){
+      // We are not using MIPS FPU instructions, and parameters for the run-time
+      // function call are prepaired in a0-a3 registers, but function we are
+      // calling is compiled with hard-float flag and expecting hard float ABI
+      // (parameters in f12/f14 registers). We need to copy parameters from a0-a3
+      // registers to f12/f14 register pairs.
+      __ mtc1(a0, f12);
+      __ mtc1(a1, f13);
+      __ mtc1(a2, f14);
+      __ mtc1(a3, f15);
+    }
     __ CallCFunction(ExternalReference::compare_doubles(), 4);
     __ Pop(ra);  // Because this function returns int, result is in v0.
     __ Ret();
@@ -6209,30 +6219,30 @@ static void HandleBinaryOpSlowCases(MacroAssembler* masm,
       __ Push(ra);
       __ Push(t0);
       __ PrepareCallCFunction(4, t1);  // Two doubles count as 4 arguments.
-#if(defined(__mips_soft_float) && __mips_soft_float != 0)
-      // We are using MIPS FPU instructions, and parameters for the run-time
-      // function call are prepared in f12/f14 register pairs, but function
-      // we are calling is compiled with soft-float flag and expecting soft 
-      // float ABI (parameters in a0-a3 registers). We need to copy parameters
-      // from f12/f14 register pairs to a0-a3 registers.
-      __ mfc1(a0, f12);
-      __ mfc1(a1, f13);
-      __ mfc1(a2, f14);
-      __ mfc1(a3, f15);
-#endif
+      if(IsMipsSoftFloatABI){
+        // We are using MIPS FPU instructions, and parameters for the run-time
+        // function call are prepared in f12/f14 register pairs, but function
+        // we are calling is compiled with soft-float flag and expecting soft 
+        // float ABI (parameters in a0-a3 registers). We need to copy parameters
+        // from f12/f14 register pairs to a0-a3 registers.
+        __ mfc1(a0, f12);
+        __ mfc1(a1, f13);
+        __ mfc1(a2, f14);
+        __ mfc1(a3, f15);
+      }
       __ CallCFunction(ExternalReference::double_fp_operation(operation), 4);
       __ Pop(t0);  // Address of heap number.
       __ Pop(ra);
-#if(defined(__mips_soft_float) && __mips_soft_float != 0)
-      // Store answer in the overwritable heap number.
-      // Double returned is stored in registers v0 and v1 (function we called
-      // is compiled with soft-float flag and uses soft-float ABI).
-      __ sw(v0, FieldMemOperand(t0, HeapNumber::kValueOffset));
-      __ sw(v1, FieldMemOperand(t0, HeapNumber::kValueOffset + 4));
-      __ mov(v0, t0);  // Return object ptr to caller.
-      __ Ret();
-      return;
-#endif
+      if(IsMipsSoftFloatABI){
+        // Store answer in the overwritable heap number.
+        // Double returned is stored in registers v0 and v1 (function we called
+        // is compiled with soft-float flag and uses soft-float ABI).
+        __ sw(v0, FieldMemOperand(t0, HeapNumber::kValueOffset));
+        __ sw(v1, FieldMemOperand(t0, HeapNumber::kValueOffset + 4));
+        __ mov(v0, t0);  // Return object ptr to caller.
+        __ Ret();
+        return;
+      }
     } else {
       UNREACHABLE();
     }
@@ -6255,30 +6265,32 @@ static void HandleBinaryOpSlowCases(MacroAssembler* masm,
 
   __ PrepareCallCFunction(4, t1);  // Two doubles count as 4 arguments.
   // Call C routine that may not cause GC or other trouble.
-#if(defined(__mips_hard_float) && __mips_hard_float != 0)
-  if(!use_fp_registers){
-    // We are not using MIPS FPU instructions, and parameters for the run-time
-    // function call are prepared in a0-a3 registers, but the function we are
-    // calling is compiled with hard-float flag and expecting hard float ABI
-    // (parameters in f12/f14 registers). We need to copy parameters from a0-a3
-    // registers to f12/f14 register pairs.
-    __ mtc1(a0, f12);
-    __ mtc1(a1, f13);
-    __ mtc1(a2, f14);
-    __ mtc1(a3, f15);
+  if(!IsMipsSoftFloatABI){
+    if(!use_fp_registers){
+      // We are not using MIPS FPU instructions, and parameters for the run-time
+      // function call are prepared in a0-a3 registers, but the function we are
+      // calling is compiled with hard-float flag and expecting hard float ABI
+      // (parameters in f12/f14 registers). We need to copy parameters from a0-a3
+      // registers to f12/f14 register pairs.
+      __ mtc1(a0, f12);
+      __ mtc1(a1, f13);
+      __ mtc1(a2, f14);
+      __ mtc1(a3, f15);
+    }
   }
-#endif
+
   __ CallCFunction(ExternalReference::double_fp_operation(operation), 4);
-#if(defined(__mips_hard_float) && __mips_hard_float != 0)
-  if(!use_fp_registers){
-    // Returned double value is stored in registers f0 and f1 (function we 
-    // called is compiled with hard-float flag and uses hard-float ABI). Return
-    // value in the case when we are not using MIPS FPU instructions has to be 
-    // placed in v0/v1, so we need to copy from f0/f1.
-    __ mfc1(v0, f0);
-    __ mfc1(v1, f1);
+
+  if(!IsMipsSoftFloatABI){
+    if(!use_fp_registers){
+      // Returned double value is stored in registers f0 and f1 (function we 
+      // called is compiled with hard-float flag and uses hard-float ABI). Return
+      // value in the case when we are not using MIPS FPU instructions has to be 
+      // placed in v0/v1, so we need to copy from f0/f1.
+      __ mfc1(v0, f0);
+      __ mfc1(v1, f1);
+    }
   }
-#endif
   __ Pop(t0);  // Address of heap number.
   // Store answer in the overwritable heap number.
 

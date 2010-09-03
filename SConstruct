@@ -194,13 +194,26 @@ LIBRARY_FLAGS = {
     'arch:mips': {
       'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS'],
       'simulator:none': {
-        'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2', '-mhard-float'],
-        'LDFLAGS':      ['-EL', '-static', '-static-libgcc']
+        'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2'],
+        'LDFLAGS':      ['-EL', '-static', '-static-libgcc'],
+        'mipsabi:softfloat': {
+          'CCFLAGS':      ['-msoft-float'],
+          'LINKFLAGS':    ['-msoft-float'],
+          'LDFLAGS':      ['-msoft-float']
+        },
+        'mipsabi:hardfloat': {
+          'CCFLAGS':      ['-mhard-float'],
+          'LINKFLAGS':    ['-mhard-float'],
+          'LDFLAGS':      ['-mhard-float']
+        }
       }
     },
     'simulator:mips': {
       'CCFLAGS':      ['-m32'],
-      'LINKFLAGS':    ['-m32']
+      'LINKFLAGS':    ['-m32'],
+      'mipsabi:softfloat': {
+        'CPPDEFINES':    ['__mips_soft_float=1'],
+      }
     },
     'arch:x64': {
       'CPPDEFINES':   ['V8_TARGET_ARCH_X64'],
@@ -387,9 +400,19 @@ CCTEST_EXTRA_FLAGS = {
     },
     'arch:mips': {
       'simulator:none': {
-        'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2', '-mhard-float'],
+        'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2'],
         'LINKFLAGS':    ['-EL', '-static', '-static-libgcc'],
-        'LDFLAGS':      ['-EL', '-static', '-static-libgcc']
+        'LDFLAGS':      ['-EL', '-static', '-static-libgcc'],
+        'mipsabi:softfloat': {
+          'CCFLAGS':      ['-msoft-float'],
+          'LINKFLAGS':    ['-msoft-float'],
+          'LDFLAGS':      ['-msoft-float']
+        },
+        'mipsabi:hardfloat': {
+          'CCFLAGS':      ['-mhard-float'],
+          'LINKFLAGS':    ['-mhard-float'],
+          'LDFLAGS':      ['-mhard-float']
+        }
       }
     },
     'os:solaris': {
@@ -490,9 +513,19 @@ SAMPLE_FLAGS = {
     'arch:mips': {
       'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS'],
       'simulator:none': {
-        'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2', '-mhard-float'],
+        'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2'],
         'LINKFLAGS':    ['-EL', '-static', '-static-libgcc'],
-        'LDFLAGS':      ['-EL', '-static', '-static-libgcc']
+        'LDFLAGS':      ['-EL', '-static', '-static-libgcc'],
+        'mipsabi:softfloat': {
+          'CCFLAGS':      ['-msoft-float'],
+          'LINKFLAGS':    ['-msoft-float'],
+          'LDFLAGS':      ['-msoft-float']
+        },
+        'mipsabi:hardfloat': {
+          'CCFLAGS':      ['-mhard-float'],
+          'LINKFLAGS':    ['-mhard-float'],
+          'LDFLAGS':      ['-mhard-float']
+        }
       }
     },
     'simulator:arm': {
@@ -501,7 +534,10 @@ SAMPLE_FLAGS = {
     },
     'simulator:mips': {
       'CCFLAGS':      ['-m32'],
-      'LINKFLAGS':    ['-m32']
+      'LINKFLAGS':    ['-m32'],
+      'mipsabi:softfloat': {
+        'CPPDEFINES':    ['__mips_soft_float=1'],
+      }
     },
     'mode:release': {
       'CCFLAGS':      ['-O2']
@@ -740,7 +776,12 @@ SIMPLE_OPTIONS = {
     'values': ['off', 'instrument', 'optimize'],
     'default': 'off',
     'help': 'select profile guided optimization variant',
-  }
+  },
+  'mipsabi': {
+    'values': ['hardfloat', 'softfloat', 'none'],
+    'default': 'softfloat',
+    'help': 'generate calling conventiont according to selected mips ABI'
+  },
 }
 
 
@@ -937,6 +978,12 @@ def PostprocessOptions(options, os):
     if ('regexp' in ARGUMENTS) and options['regexp'] == 'native':
       # Print a warning if native regexp is specified for mips
       print "Warning: implementation of native regexp not fully completed"
+  if (options['simulator'] == 'mips' and options['mipsabi'] != 'softfloat'):
+    # Print a warning if soft-float ABI is not selected for mips simulator
+    print "Warning: forcing soft-float mips ABI when running on simulator"
+    options['mipsabi'] = 'softfloat'
+  if (options['mipsabi'] != 'none') and (options['arch'] != 'mips') and (options['simulator'] != 'mips'):
+    options['mipsabi'] = 'none'
 
 
 def ParseEnvOverrides(arg, imports):
