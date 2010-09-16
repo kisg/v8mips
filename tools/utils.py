@@ -71,7 +71,7 @@ def GuessArchitecture():
     return 'ia32'
   elif id == 'i86pc':
     return 'ia32'
-  elif id == 'mips'
+  elif id == 'mips':
     return 'mips' 
   else:
     return None
