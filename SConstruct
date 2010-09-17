@@ -195,16 +195,14 @@ LIBRARY_FLAGS = {
       'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS'],
       'simulator:none': {
         'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2'],
-        'LDFLAGS':      ['-EL', '-static', '-static-libgcc'],
+        'LINKFLAGS':    ['-EL'],
         'mipsabi:softfloat': {
           'CCFLAGS':      ['-msoft-float'],
           'LINKFLAGS':    ['-msoft-float'],
-          'LDFLAGS':      ['-msoft-float']
         },
         'mipsabi:hardfloat': {
           'CCFLAGS':      ['-mhard-float'],
           'LINKFLAGS':    ['-mhard-float'],
-          'LDFLAGS':      ['-mhard-float']
         }
       }
     },
@@ -401,17 +399,17 @@ CCTEST_EXTRA_FLAGS = {
     'arch:mips': {
       'simulator:none': {
         'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2'],
-        'LINKFLAGS':    ['-EL', '-static', '-static-libgcc'],
-        'LDFLAGS':      ['-EL', '-static', '-static-libgcc'],
+        'LINKFLAGS':    ['-EL'],
+        'library:static': {
+          'LINKFLAGS':  ['-static', '-static-libgcc']
+        },
         'mipsabi:softfloat': {
           'CCFLAGS':      ['-msoft-float'],
           'LINKFLAGS':    ['-msoft-float'],
-          'LDFLAGS':      ['-msoft-float']
         },
         'mipsabi:hardfloat': {
           'CCFLAGS':      ['-mhard-float'],
           'LINKFLAGS':    ['-mhard-float'],
-          'LDFLAGS':      ['-mhard-float']
         }
       }
     },
@@ -514,17 +512,17 @@ SAMPLE_FLAGS = {
       'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS'],
       'simulator:none': {
         'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2'],
-        'LINKFLAGS':    ['-EL', '-static', '-static-libgcc'],
-        'LDFLAGS':      ['-EL', '-static', '-static-libgcc'],
+        'LINKFLAGS':    ['-EL'],
+        'library:static': {
+          'LINKFLAGS':  ['-static', '-static-libgcc']
+        },
         'mipsabi:softfloat': {
           'CCFLAGS':      ['-msoft-float'],
           'LINKFLAGS':    ['-msoft-float'],
-          'LDFLAGS':      ['-msoft-float']
         },
         'mipsabi:hardfloat': {
           'CCFLAGS':      ['-mhard-float'],
           'LINKFLAGS':    ['-mhard-float'],
-          'LDFLAGS':      ['-mhard-float']
         }
       }
     },
@@ -1062,7 +1060,7 @@ def BuildSpecific(env, mode, env_overrides):
 
   # Link the object files into a library.
   env.Replace(**context.flags['v8'])
-  env.Prepend(LIBS=[library_name])
+  ########  env.Prepend(LIBS=[library_name])
 
   context.ApplyEnvOverrides(env)
   if context.options['library'] == 'static':
