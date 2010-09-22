@@ -193,8 +193,16 @@ LIBRARY_FLAGS = {
     },
     'arch:mips': {
       'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS'],
+      'mips_arch_variant:mips32r2': {
+        'CPPDEFINES':    ['_MIPS_ARCH_MIPS32R2']
+      },
       'simulator:none': {
+        'mips_arch_variant:mips32r2': {
         'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2'],
+        },
+        'mips_arch_variant:mips32r1': {
+        'CCFLAGS':      ['-EL', '-mips32r1', '-Wa,-mips32r1']
+        },
         'LINKFLAGS':    ['-EL'],
         'mipsabi:softfloat': {
           'CCFLAGS':      ['-msoft-float'],
@@ -397,8 +405,16 @@ CCTEST_EXTRA_FLAGS = {
       'LIBS':         ['execinfo', 'pthread']
     },
     'arch:mips': {
+      'mips_arch_variant:mips32r2': {
+        'CPPDEFINES':    ['_MIPS_ARCH_MIPS32R2']
+      },
       'simulator:none': {
+        'mips_arch_variant:mips32r2': {
         'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2'],
+        },
+        'mips_arch_variant:mips32r1': {
+        'CCFLAGS':      ['-EL', '-mips32r1', '-Wa,-mips32r1']
+        },
         'LINKFLAGS':    ['-EL'],
         'library:static': {
           'LINKFLAGS':  ['-static', '-static-libgcc']
@@ -510,8 +526,16 @@ SAMPLE_FLAGS = {
     },
     'arch:mips': {
       'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS'],
+      'mips_arch_variant:mips32r2': {
+        'CPPDEFINES':    ['_MIPS_ARCH_MIPS32R2']
+      },
       'simulator:none': {
+        'mips_arch_variant:mips32r2': {
         'CCFLAGS':      ['-EL', '-mips32r2', '-Wa,-mips32r2'],
+        },
+        'mips_arch_variant:mips32r1': {
+        'CCFLAGS':      ['-EL', '-mips32r1', '-Wa,-mips32r1']
+        },
         'LINKFLAGS':    ['-EL'],
         'library:static': {
           'LINKFLAGS':  ['-static', '-static-libgcc']
@@ -779,6 +803,11 @@ SIMPLE_OPTIONS = {
     'values': ['hardfloat', 'softfloat', 'none'],
     'default': 'hardfloat',
     'help': 'generate calling conventiont according to selected mips ABI'
+  },
+  'mips_arch_variant': {
+    'values': ['mips32r2', 'mips32r1'],
+    'default': 'mips32r2',
+    'help': 'mips variant'
   },
 }
 
