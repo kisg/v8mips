@@ -691,7 +691,7 @@ void Decoder::DecodeTypeRegister(Instruction* instr) {
         case MOVZ:
           Format(instr, "movz 'rd, 'rs, 'rt");
           break;
-        case MOVN: {
+        case MOVN:
           Format(instr, "movn 'rd, 'rs, 'rt");
           break;
         default:
