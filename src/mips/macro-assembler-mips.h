@@ -317,6 +317,9 @@ DECLARE_NOTARGET_PROTOTYPE(Ret)
   DEFINE_INSTRUCTION(Slt);
   DEFINE_INSTRUCTION(Sltu);
 
+  // MIPS32 R2 instruction macro
+  DEFINE_INSTRUCTION(Ror);
+
 #undef DEFINE_INSTRUCTION
 #undef DEFINE_INSTRUCTION2
 
@@ -366,6 +369,8 @@ DECLARE_NOTARGET_PROTOTYPE(Ret)
     Addu(sp, sp, Operand(count * kPointerSize));
   }
 
+  // MIPS32 R2 instruction macro
+  void Ins(Register rt, Register rs, uint16_t pos, uint16_t size);
 
   // -------------------------------------------------------------------------
   // Activation frames

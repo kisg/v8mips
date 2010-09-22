@@ -38,6 +38,12 @@
 #include "serialize.h"
 
 
+#ifdef _MIPS_ARCH_MIPS32R2
+#define mips32r2 1
+#else
+#define mips32r2 0
+#endif
+
 namespace v8 {
 namespace internal {
 
@@ -958,16 +964,26 @@ void Assembler::srav(Register rd, Register rt, Register rs) {
 
 void Assembler::rotr(Register rd, Register rt, uint16_t sa) {
   ASSERT(rd.is_valid() && rt.is_valid() && is_uint5(sa));
-  Instr instr = SPECIAL | (1 << kRsShift) | (rt.code() << kRtShift)
-      | (rd.code() << kRdShift) | (sa << kSaShift) | SRL;
-  emit(instr);
+  if (mips32r2) {
+    Instr instr = SPECIAL | (1 << kRsShift) | (rt.code() << kRtShift)
+        | (rd.code() << kRdShift) | (sa << kSaShift) | SRL;
+    emit(instr);
+  } else {
+    // Just in case. You should generally use this through MacroAssembler::Ror.
+    UNIMPLEMENTED_MIPS();
+  }
 }
 
 void Assembler::rotrv(Register rd, Register rt, Register rs) {
   ASSERT(rd.is_valid() && rt.is_valid() && rs.is_valid() );
-  Instr instr = SPECIAL | (rs.code() << kRsShift) | (rt.code() << kRtShift)
-      | (rd.code() << kRdShift) | (1 << kSaShift) | SRLV;
-  emit(instr);
+  if (mips32r2) {
+    Instr instr = SPECIAL | (rs.code() << kRsShift) | (rt.code() << kRtShift)
+        | (rd.code() << kRdShift) | (1 << kSaShift) | SRLV;
+    emit(instr);
+  } else {
+    // Just in case. You should generally use this through MacroAssembler::Ror.
+    UNIMPLEMENTED_MIPS();
+  }
 }
 
 //------------Memory-instructions-------------
@@ -1145,14 +1161,25 @@ void Assembler::clz(Register rd, Register rs) {
 
 
 void Assembler::ins(Register rt, Register rs, uint16_t pos, uint16_t size) {
-  // Ins instr has 'rt' field as dest, and two uint5: msb, lsb
-  GenInstrRegister(SPECIAL3, rs, rt, pos + size - 1, pos, INS);
+  if (mips32r2) {
+    // Ins instr has 'rt' field as dest, and two uint5: msb, lsb
+    GenInstrRegister(SPECIAL3, rs, rt, pos + size - 1, pos, INS);
+  } else {
+    // Just in case. This instruction should be called through MacroAssembler::Ins.
+    UNIMPLEMENTED_MIPS();
+  }
 }
 
 
 void Assembler::ext(Register rt, Register rs, uint16_t pos, uint16_t size) {
-  // Ext instr has 'rt' field as dest, and two uint5: msb, lsb
-  GenInstrRegister(SPECIAL3, rs, rt, pos + size - 1, pos, EXT);
+  if (mips32r2) {
+    // Ext instr has 'rt' field as dest, and two uint5: msb, lsb
+    GenInstrRegister(SPECIAL3, rs, rt, pos + size - 1, pos, EXT);
+  } else {
+    // Move rs to rt and shift it left then right to get the desired bitfield on the right side and zeroes on the left.
+    sll(rt, rs, 32-(pos+size));
+    srl(rt, rt, (pos-1 + 32 - (pos + size)));
+  }
 }
 
 
