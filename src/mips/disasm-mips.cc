@@ -62,6 +62,12 @@
 #include "macro-assembler.h"
 #include "platform.h"
 
+#ifdef _MIPS_ARCH_MIPS32R2
+#define mips32r2 1
+#else
+#define mips32r2 0
+#endif
+
 namespace assembler {
 namespace mips {
 
@@ -580,7 +586,11 @@ void Decoder::DecodeTypeRegister(Instruction* instr) {
           if (instr->RsField() == 0) {
             Format(instr, "srl  'rd, 'rt, 'sa");
           } else {
-            Format(instr, "rotr  'rd, 'rt, 'sa");
+            if (mips32r2) {
+              Format(instr, "rotr  'rd, 'rt, 'sa");
+            } else {
+              Unknown(instr);
+            }
           }
           break;
         case SRA:
@@ -593,7 +603,11 @@ void Decoder::DecodeTypeRegister(Instruction* instr) {
           if (instr->SaField() == 0) {
             Format(instr, "srlv 'rd, 'rt, 'rs");
           } else {
-            Format(instr, "rotrv 'rd, 'rt, 'rs");
+            if (mips32r2) {
+              Format(instr, "rotrv 'rd, 'rt, 'rs");
+            } else {
+              Unknown(instr);
+            }
           }
           break;
         case SRAV:
@@ -677,7 +691,7 @@ void Decoder::DecodeTypeRegister(Instruction* instr) {
         case MOVZ:
           Format(instr, "movz 'rd, 'rs, 'rt");
           break;
-        case MOVN:
+        case MOVN: {
           Format(instr, "movn 'rd, 'rs, 'rt");
           break;
         default:
@@ -698,11 +712,21 @@ void Decoder::DecodeTypeRegister(Instruction* instr) {
       break;
     case SPECIAL3:
       switch (instr->FunctionFieldRaw()) {
-        case INS:
-          Format(instr, "ins  'rt, 'rs, 'sd, 'sa");
+        case INS: {
+            if (mips32r2) {
+              Format(instr, "ins  'rt, 'rs, 'sd, 'sa");
+            } else {
+              Unknown(instr);
+            }
+          }
           break;
-        case EXT:
-          Format(instr, "ext  'rt, 'rs, 'sd, 'sa");
+        case EXT: {
+            if (mips32r2) {
+              Format(instr, "ext  'rt, 'rs, 'sd, 'sa");
+            } else {
+              Unknown(instr);
+            }
+          }
           break;
         default:
           UNREACHABLE();
